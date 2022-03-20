@@ -5,15 +5,15 @@ from abc import ABC
 class Primitive(ABC):
     def __init__(self) -> None:
         super().__init__()
-        
-    def query(xyzs):
+
+    def query(self, xyzs):
         return np.array([])
 
-    def query_sigma(xyzs):
+    def query_sigma(self, xyzs):
         return np.array([])
 
-    def query_color(geo_features, views):
+    def query_color(self, geo_features, views):
         return np.array([])
 
-    def build_module_graph(module_key, module):
+    def build_module_graph(self, module_key, module):
         pass
