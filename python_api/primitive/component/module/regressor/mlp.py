@@ -13,12 +13,13 @@ class MLP(nn.Module):
                  act_on_last_layer=False) -> None:
         super(MLP, self).__init__()
 
+        self.skip_connections = skip_connections
         first_layer = [nn.Linear(input_ch, W)]
-        hidden_layers = [nn.Linear(W, W) if i not in self.skips else nn.Linear(W + input_ch, W)
+        hidden_layers = [nn.Linear(W, W) if i not in self.skip_connections
+                         else nn.Linear(W + input_ch, W)
                          for i in range(D-1)]
         self.linears = nn.ModuleList(first_layer+hidden_layers)
         self.activation = activation
-        self.skip_connections = skip_connections
         self.last_layer = nn.Linear(W, output_ch)
         self.act_on_last_layer = act_on_last_layer
         pass
