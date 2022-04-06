@@ -1,4 +1,4 @@
-from ..primitive.base_nerf import BaseNeRF
+from python_api.primitive.base_nerf import BaseNeRF
 
 
 def main():

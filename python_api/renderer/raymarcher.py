@@ -1,6 +1,15 @@
-class RayMarcher:
-    def __init__(self) -> None:
-        pass
+from python_api.utils import FunctionRegistry
 
-    def sample_points(self, rays_o, rays_d):
-        pass
+
+def uniform_sampler():
+    pass
+
+
+def importance_sampler():
+    pass
+
+
+raymarcher = FunctionRegistry(
+    uniform_sampler=uniform_sampler,
+    importance_sampler=importance_sampler,
+)

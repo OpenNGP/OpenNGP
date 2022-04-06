@@ -1,6 +1,10 @@
-class Integrator:
-    def __init__(self) -> None:
-        pass
+from python_api.utils import FunctionRegistry
 
-    def integrate(self, sigmas, colors):
-        pass
+
+def volume_integrator():
+    pass
+
+
+integrator = FunctionRegistry(
+    volume_integrator=volume_integrator
+)

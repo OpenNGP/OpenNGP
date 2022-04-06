@@ -1,4 +1,4 @@
-from ..module import encoder, regressor
+from python_api.primitive.component.module import encoder, regressor
 
 
 class Sigma:

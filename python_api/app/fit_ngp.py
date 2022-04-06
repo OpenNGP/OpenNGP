@@ -1,5 +1,5 @@
-from ..primitive.base_nerf import BaseNeRF
-from ..renderer.renderer import Renderer
+from python_api.primitive.base_nerf import BaseNeRF
+from python_api.renderer.renderer import Renderer
 
 
 def main():
