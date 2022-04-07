@@ -17,3 +17,9 @@ class Primitive(ABC):
 
     def build_module_graph(self, module_key, module):
         pass
+
+    def to(self, device):
+        raise NotImplementedError
+
+    def parameters(self):
+        raise NotImplementedError

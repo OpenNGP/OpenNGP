@@ -1,0 +1,26 @@
+Config.data_dir = '/home/asua/muyu/data/hd0/nerfingmvs_data/fuyinshi_1'
+Config.dataset_loader = 'muyu'
+Config.batching = 'single_image'
+Config.batch_size = 1024
+Config.near = 0.01 
+Config.far = 1.0
+Config.white_bkgd = False
+Config.render_passes = [
+    (
+        'coarse',
+        ('uniform_sampler', {
+            'N_samples': 128,
+            'lindisp': False,
+            'perturb': True
+        }),
+        ('volume_integrator', {})
+    ),
+    (
+        'fine',
+        ('importance_sampler', {
+            'N_importance': 128, 
+            'perturb': True
+        }),
+        ('volume_integrator', {})
+    )
+]

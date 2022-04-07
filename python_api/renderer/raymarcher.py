@@ -1,7 +1,14 @@
 import torch
 import numpy as np
+from collections import namedtuple
 from python_api.renderer.rays import Rays
 from python_api.utils import FunctionRegistry
+
+
+SamplerResult = namedtuple(
+    'SamplerResult',
+    ('xyzs', 'views', 'z_vals', 'deltas')
+)
 
 
 # Hierarchical sampling (section 5.2)
@@ -52,7 +59,8 @@ def sample_pdf(bins, weights, N_samples, det=False, pytest=False):
 
 
 def uniform_sampler(rays: Rays, N_samples: int, lindisp: bool, perturb: bool):
-    near, far, rays_o, rays_d = rays.nears, rays.fars, rays.origins, rays.dirs
+    near, far = rays.near, rays.far
+    rays_o, rays_d = rays.origins, rays.directions
     N_rays = rays_o.shape[0]
 
     t_vals = torch.linspace(0., 1., steps=N_samples)
@@ -74,18 +82,39 @@ def uniform_sampler(rays: Rays, N_samples: int, lindisp: bool, perturb: bool):
         z_vals = lower + (upper - lower) * t_rand
 
     pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples, 3]
-    return pts, rays_d
+    
+    # Convert these values using volume rendering (Section 4)
+    deltas = z_vals[:, 1:] - z_vals[:, :-1] # (N_rays, N_samples_-1)
+    delta_inf = 1e10 * torch.ones_like(deltas[:, :1]) # (N_rays, 1) the last delta is infinity
+    deltas = torch.cat([deltas, delta_inf], -1)  # (N_rays, N_samples_)
+
+    views = rays_d[...,None,:].expand(pts.shape)
+
+    return SamplerResult(pts, views, z_vals, deltas)
 
 
-def importance_sampler(rays: Rays, weights, N_importance, perturb):
-    rays_o, rays_d = rays.origins, rays.dirs
+def importance_sampler(rays: Rays,
+                       samples: SamplerResult,  # samples from last pass
+                       weights,
+                       N_importance,
+                       perturb):
+    rays_o, rays_d = rays.origins, rays.directions
+    z_vals = samples.z_vals
     z_vals_mid = .5 * (z_vals[...,1:] + z_vals[...,:-1])
     z_samples = sample_pdf(z_vals_mid, weights[...,1:-1], N_importance, det=(perturb==0.))
     z_samples = z_samples.detach()
 
     z_vals, _ = torch.sort(torch.cat([z_vals, z_samples], -1), -1)
     pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples + N_importance, 3]
-    return pts, rays_d
+
+    # Convert these values using volume rendering (Section 4)
+    deltas = z_vals[:, 1:] - z_vals[:, :-1] # (N_rays, N_samples_-1)
+    delta_inf = 1e10 * torch.ones_like(deltas[:, :1]) # (N_rays, 1) the last delta is infinity
+    deltas = torch.cat([deltas, delta_inf], -1)  # (N_rays, N_samples_)
+
+    views = rays_d[...,None,:].expand(pts.shape)
+    
+    return SamplerResult(pts, views, z_vals, deltas)
 
 
 raymarcher = FunctionRegistry(

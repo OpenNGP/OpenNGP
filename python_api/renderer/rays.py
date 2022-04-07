@@ -1,6 +1,3 @@
-class Rays:
-    def __init__(self, origins, dirs, nears, fars) -> None:
-        self.origins = origins
-        self.dirs = dirs
-        self.nears = nears
-        self.fars = fars
+from collections import namedtuple
+
+Rays = namedtuple('Rays', ('origins', 'directions', 'viewdirs', 'radii', 'lossmult', 'near', 'far'))
