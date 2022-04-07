@@ -9,7 +9,7 @@ Config.render_passes = [
     (
         'coarse',
         ('uniform_sampler', {
-            'N_samples': 128,
+            'N_samples': 64,
             'lindisp': False,
             'perturb': True
         }),
@@ -18,7 +18,7 @@ Config.render_passes = [
     (
         'fine',
         ('importance_sampler', {
-            'N_importance': 128, 
+            'N_importance': 64, 
             'perturb': True
         }),
         ('volume_integrator', {})
