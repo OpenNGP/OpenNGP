@@ -1,4 +1,5 @@
 Config.data_dir = '/home/asua/muyu/data/hd0/nerfingmvs_data/fuyinshi_1'
+Config.exp_dir = '/home/asua/muyu/data/hd0/nerfingmvs_data/openNGP_exps/fuyinshi_1/debug'
 Config.dataset_loader = 'muyu'
 Config.batching = 'single_image'
 Config.batch_size = 1024

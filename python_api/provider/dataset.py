@@ -407,7 +407,7 @@ class Muyu(Dataset):
       meta = json.load(fp)
 
     if 'train' == self.split:
-      frames = meta['frames'][1:5]
+      frames = meta['frames'][1:]
       cams, hw = self._load_rendering_data(config, frames)
     elif 'test' == self.split:
       if config.render_path:
