@@ -407,7 +407,8 @@ class Muyu(Dataset):
       meta = json.load(fp)
 
     if 'train' == self.split:
-      frames = meta['frames'][1:]
+      mid = len(meta['frames']) // 2
+      frames = meta['frames'][:mid] + meta['frames'][mid+1:]
       cams, hw = self._load_rendering_data(config, frames)
     elif 'test' == self.split:
       if config.render_path:
@@ -416,7 +417,8 @@ class Muyu(Dataset):
         cams = self._load_rendering_path(config, frames)
         hw = (int(meta['h']), int(meta['w']))
       else:
-        frames = meta['frames'][:1]
+        mid = len(meta['frames']) // 2
+        frames = meta['frames'][mid:mid+1]
         cams, hw = self._load_rendering_data(config, frames)
     else:
       raise ValueError('Unkown split for Muyu Dataset')

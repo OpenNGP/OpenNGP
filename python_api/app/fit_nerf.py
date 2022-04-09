@@ -1,11 +1,13 @@
 import gin
 import dataclasses
+import numpy as np
 import torch
 import torch.optim as optim
 import tqdm
 
 from tensorboardX import SummaryWriter
-from os.path import join as pjoin
+from os import makedirs
+from os.path import exists, join as pjoin
 from rich.console import Console
 
 from python_api.primitive.base_nerf import BaseNeRF
@@ -34,7 +36,7 @@ class Config:
     grad_max_norm: float = 0.  # Gradient clipping magnitude, disabled if == 0.
     grad_max_val: float = 0.  # Gradient clipping value, disabled if == 0.
     max_steps: int = 200000  # The number of optimization steps.
-    save_every: int = 100000  # The number of steps to save a checkpoint.
+    save_every: int = 10000  # The number of steps to save a checkpoint.
     print_every: int = 100  # The number of steps between reports to tensorboard.
     gc_every: int = 10000  # The number of steps between garbage collections.
     test_render_interval: int = 1  # The interval between images saved to disk.
@@ -48,8 +50,8 @@ class Config:
     render_passes: list = dataclasses.field(default_factory=list)
 
 
-def main():
-    gin.parse_config_files_and_bindings(['test/test.gin'], None)
+def main(config_file):
+    gin.parse_config_files_and_bindings([config_file], None)
     config = Config()
     console = Console()
 
@@ -61,13 +63,18 @@ def main():
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
     ngp.to(device)
 
+    console.print('NGP Geometry: ', ngp.geometry)
+    console.print('NGP Appearance: ', ngp.appearance)
+
     console.print('==> build dataset')
     dataset = get_dataset('train', config.data_dir, config)
+    val_dataset = get_dataset('test', config.data_dir, config)
 
     console.print('==> init optimize routine')
     criterion = torch.nn.HuberLoss(delta=0.1)
     img2mse = lambda x, y : torch.mean((x - y) ** 2)
     mse2psnr = lambda x : -10. * torch.log(x) / torch.log(torch.Tensor([10.]))
+    to8b = lambda x : (255*np.clip(x,0,1)).astype(np.uint8)
 
     optimizer = torch.optim.Adam([
         {'name': 'net', 'params': ngp.parameters(), 'weight_decay': 5e-6},
@@ -75,12 +82,14 @@ def main():
 
     milestones = [40000, 80000, 120000]
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.33)
-    writer = SummaryWriter(pjoin(config.exp_dir, "run"))
+    summary_dir = pjoin(config.exp_dir, "run")
+    if not exists(summary_dir): makedirs(summary_dir)
+    writer = SummaryWriter(summary_dir)
 
     total_loss = 0
     init_step = 1  # state.optimizer.state.step + 1
     pbar = tqdm.tqdm(total=config.max_steps, bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
-    pbar.update(init_step)
+    pbar.update(init_step-1)
 
     console.print('==> start fitting NGP')
     for step, batch in zip(range(init_step, config.max_steps + 1), dataset):
@@ -89,8 +98,8 @@ def main():
             batch['rays']
         )
         pixels_gt = torch.from_numpy(batch['pixels']).to(device, non_blocking=True)
-        rets = renderer.render(rays, ngp)
         optimizer.zero_grad()
+        rets = renderer.render(rays, ngp)
         loss = 0
         for ret in rets:
             loss += criterion(ret.pixels.colors, pixels_gt)
@@ -110,6 +119,42 @@ def main():
             writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], step)
             writer.add_scalar("train/psnr", psnr, step)
 
+        if step % config.save_every == 0:
+            test_batch = next(val_dataset)
+            chunk = val_dataset.batch_size
+            test_rays = test_batch['rays']
+            height, width = test_rays[0].shape[:2]
+            num_rays = height * width
+            test_rays = namedtuple_map(
+                lambda r: r.reshape((num_rays, -1)),
+                test_rays
+            )
+            test_rays = namedtuple_map(
+                lambda r: torch.from_numpy(r).to(device, non_blocking=True),
+                test_rays
+            )
+            test_pixels_gt = torch.from_numpy(test_batch['pixels'])
+            test_pixels_gt = test_pixels_gt.to(device, non_blocking=True)
+            results = []
+            with torch.no_grad():
+                for i in range(0, num_rays, chunk):
+                    # pylint: disable=cell-var-from-loop
+                    chunk_rays = namedtuple_map(
+                        lambda r: r[i:i + chunk],
+                        test_rays
+                    )
+                    rets = renderer.render(chunk_rays, ngp)
+                    results.append(rets[-1].pixels.colors)
+                test_pixels = torch.concat(results)
+                test_pixels = test_pixels.reshape((height, width, -1))
+                test_loss = criterion(test_pixels, test_pixels_gt).item()
+                test_psnr = mse2psnr(img2mse(test_pixels, test_pixels_gt))
+                test_psnr = test_psnr.item()
+                img = to8b(test_pixels.cpu().numpy()).transpose((2, 0, 1))
+            writer.add_image('test/rgb', img, step)
+            writer.add_scalar("train/loss", test_loss, step)
+            writer.add_scalar("train/psnr", test_psnr, step)
+
         pbar.set_description(f"loss={loss_val:.4f} ({total_loss/step:.4f}), psnr={psnr:.4f}, lr={optimizer.param_groups[0]['lr']:.6f}")
         pbar.update()
 
@@ -119,4 +164,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('config_path', type=str, help='config path')
+    opt = parser.parse_args()
+    main(opt.config_path)
