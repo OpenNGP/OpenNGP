@@ -76,6 +76,8 @@ class Dataset(threading.Thread):
     self.batch_size = config.batch_size
     self.batching = config.batching
     self.render_path = config.render_path
+    self.precrop_iters = config.precrop_iters
+    self.precrop_frac = config.precrop_frac
     self.start()
 
   def __iter__(self):
@@ -123,6 +125,7 @@ class Dataset(threading.Thread):
     """Initialize training."""
     self._load_renderings(config)
     self._generate_rays()
+    self.it = 0
 
     if config.batching == 'all_images':
       # flatten the ray and image dimension together.
@@ -145,15 +148,29 @@ class Dataset(threading.Thread):
   def _next_train(self):
     """Sample next training batch."""
 
+    self.it += 1
     if self.batching == 'all_images':
       ray_indices = np.random.randint(0, self.rays[0].shape[0],
                                       (self.batch_size,))
       batch_pixels = self.images[ray_indices]
       batch_rays = namedtuple_map(lambda r: r[ray_indices], self.rays)
     elif self.batching == 'single_image':
+      if self.it <= self.precrop_iters:
+        dH = int(self.h//2 * self.precrop_frac)
+        dW = int(self.w//2 * self.precrop_frac)
+        coords = np.stack(np.meshgrid(
+          np.linspace(self.h//2 - dH, self.h//2 + dH - 1, 2*dH),
+          np.linspace(self.w//2 - dW, self.w//2 + dW - 1, 2*dW)
+        ), -1).reshape((-1, 2)).astype(int)  # [2*dH*2*dW, 2], [i, j]
+        coords = coords[:, 0] * self.w + coords[:, 1]
+        ray_indices = np.random.randint(0, coords.shape[0],
+                                        (self.batch_size,))
+        ray_indices = coords[ray_indices]
+      else:
+        ray_indices = np.random.randint(0, self.rays[0][0].shape[0],
+                                        (self.batch_size,))
+
       image_index = np.random.randint(0, self.n_examples, ())
-      ray_indices = np.random.randint(0, self.rays[0][0].shape[0],
-                                      (self.batch_size,))
       batch_pixels = self.images[image_index][ray_indices]
       batch_rays = namedtuple_map(lambda r: r[image_index][ray_indices],
                                         self.rays)
@@ -205,7 +222,7 @@ class Dataset(threading.Thread):
     ones = np.ones_like(origins[..., :1])
     self.rays = Rays(
         origins=origins,
-        directions=viewdirs,
+        directions=directions,
         viewdirs=viewdirs,
         radii=radii,
         lossmult=ones,

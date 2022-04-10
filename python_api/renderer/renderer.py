@@ -8,8 +8,8 @@ class Renderer:
     def __init__(self, pass_config: List[Tuple[str, Dict]]) -> None:
         self.passes = [RenderPass(*p) for p in pass_config]
 
-    def render(self, rays: Rays, primitive: Primitive) -> List[RenderPassResult]:
-        outputs, ctx = [], {}
+    def render(self, rays: Rays, primitive: Primitive, context: Dict = {}) -> List[RenderPassResult]:
+        outputs, ctx = [], context
         for renderpass in self.passes:
             rets = renderpass.render_pixel(rays, primitive, ctx)
             ctx = rets._asdict()

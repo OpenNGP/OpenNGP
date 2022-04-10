@@ -30,9 +30,7 @@ class Config:
     render_path: bool = False  # If True, render a path. Used only by LLFF.
     llffhold: int = 8  # Use every Nth image for the test set. Used only by LLFF.
     lr_init: float = 5e-4  # The initial learning rate.
-    lr_final: float = 5e-6  # The final learning rate.
-    lr_delay_steps: int = 2500  # The number of "warmup" learning steps.
-    lr_delay_mult: float = 0.01  # How much sever the "warmup" should be.
+    lrate_decay: int = 500
     grad_max_norm: float = 0.  # Gradient clipping magnitude, disabled if == 0.
     grad_max_val: float = 0.  # Gradient clipping value, disabled if == 0.
     max_steps: int = 200000  # The number of optimization steps.
@@ -48,6 +46,8 @@ class Config:
     weight_decay_mult: float = 0.  # The multiplier on weight decay.
     white_bkgd: bool = True  # If True, use white as the background (black o.w.).
     render_passes: list = dataclasses.field(default_factory=list)
+    precrop_iters: int = 0
+    precrop_frac: float = 0.5
 
 
 def main(config_file):
@@ -56,29 +56,37 @@ def main(config_file):
     console = Console()
 
     console.print('==> build NGP and renderer')
-    ngp = BaseNeRF()
-    renderer = Renderer(config.render_passes)
+    ngp_coarse = BaseNeRF()
+    renderer_coarse = Renderer([config.render_passes[0]])
+
+    ngp_fine = BaseNeRF()
+    renderer_fine = Renderer([config.render_passes[1]])
 
     device = torch.device(f'cuda:0' if torch.cuda.is_available() else 'cpu')
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
-    ngp.to(device)
+    ngp_coarse.to(device)
+    ngp_fine.to(device)
 
-    console.print('NGP Geometry: ', ngp.geometry)
-    console.print('NGP Appearance: ', ngp.appearance)
+    console.print('NGP coarse Geometry: ', ngp_coarse.geometry)
+    console.print('NGP coarse Appearance: ', ngp_coarse.appearance)
+
+    console.print('NGP fine Geometry: ', ngp_fine.geometry)
+    console.print('NGP fine Appearance: ', ngp_fine.appearance)
 
     console.print('==> build dataset')
     dataset = get_dataset('train', config.data_dir, config)
     val_dataset = get_dataset('test', config.data_dir, config)
 
     console.print('==> init optimize routine')
-    criterion = torch.nn.HuberLoss(delta=0.1)
+    # criterion = torch.nn.HuberLoss(delta=0.1)
+    criterion = torch.nn.MSELoss()
     img2mse = lambda x, y : torch.mean((x - y) ** 2)
     mse2psnr = lambda x : -10. * torch.log(x) / torch.log(torch.Tensor([10.]))
     to8b = lambda x : (255*np.clip(x,0,1)).astype(np.uint8)
 
     optimizer = torch.optim.Adam([
-        {'name': 'net', 'params': ngp.parameters(), 'weight_decay': 5e-6},
-    ], lr=1e-2, betas=(0.9, 0.99), eps=1e-15)
+        {'name': 'net', 'params': ngp_coarse.parameters()+ngp_fine.parameters()},
+    ], lr=config.lr_init, betas=(0.9, 0.99), eps=1e-15)
 
     milestones = [40000, 80000, 120000]
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.33)
@@ -99,7 +107,9 @@ def main(config_file):
         )
         pixels_gt = torch.from_numpy(batch['pixels']).to(device, non_blocking=True)
         optimizer.zero_grad()
-        rets = renderer.render(rays, ngp)
+        ret_coarse = renderer_coarse.render(rays, ngp_coarse)
+        ret_fine = renderer_fine.render(rays, ngp_fine, ret_coarse[-1]._asdict())
+        rets = ret_coarse + ret_fine
         loss = 0
         for ret in rets:
             loss += criterion(ret.pixels.colors, pixels_gt)
@@ -109,7 +119,15 @@ def main(config_file):
 
         loss.backward()
         optimizer.step()
-        scheduler.step()
+
+        # scheduler.step()
+        # NOTE: IMPORTANT!
+        ###   update learning rate   ###
+        decay_rate = 0.1
+        decay_steps = config.lrate_decay * 1000
+        new_lrate = config.lr_init * (decay_rate ** (step / decay_steps))
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = new_lrate
 
         loss_val = loss.item()
         total_loss += loss_val
@@ -118,6 +136,8 @@ def main(config_file):
             writer.add_scalar("train/loss", loss_val, step)
             writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], step)
             writer.add_scalar("train/psnr", psnr, step)
+            pbar.set_description(f"loss={loss_val:.4f} ({total_loss/step:.4f}), psnr={psnr:.4f}, lr={optimizer.param_groups[0]['lr']:.6f}")
+            pbar.update(config.print_every)
 
         if step % config.save_every == 0:
             test_batch = next(val_dataset)
@@ -143,8 +163,11 @@ def main(config_file):
                         lambda r: r[i:i + chunk],
                         test_rays
                     )
-                    rets = renderer.render(chunk_rays, ngp)
-                    results.append(rets[-1].pixels.colors)
+                    test_ctx = {'perturb': False}
+                    ret_coarse = renderer_coarse.render(chunk_rays, ngp_coarse, test_ctx)
+                    test_ctx.update(ret_coarse[-1]._asdict())
+                    ret_fine = renderer_fine.render(chunk_rays, ngp_fine, test_ctx)
+                    results.append(ret_fine[-1].pixels.colors)
                 test_pixels = torch.concat(results)
                 test_pixels = test_pixels.reshape((height, width, -1))
                 test_loss = criterion(test_pixels, test_pixels_gt).item()
@@ -154,9 +177,6 @@ def main(config_file):
             writer.add_image('test/rgb', img, step)
             writer.add_scalar("test/loss", test_loss, step)
             writer.add_scalar("test/psnr", test_psnr, step)
-
-        pbar.set_description(f"loss={loss_val:.4f} ({total_loss/step:.4f}), psnr={psnr:.4f}, lr={optimizer.param_groups[0]['lr']:.6f}")
-        pbar.update()
 
     writer.close()
     console.print('==> end fitting NGP')

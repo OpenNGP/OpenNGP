@@ -87,8 +87,9 @@ def uniform_sampler(rays: Rays, N_samples: int, lindisp: bool, perturb: bool):
     deltas = z_vals[:, 1:] - z_vals[:, :-1] # (N_rays, N_samples_-1)
     delta_inf = 1e10 * torch.ones_like(deltas[:, :1]) # (N_rays, 1) the last delta is infinity
     deltas = torch.cat([deltas, delta_inf], -1)  # (N_rays, N_samples_)
+    deltas = deltas * torch.norm(rays_d[...,None,:], dim=-1)
 
-    views = rays_d[...,None,:].expand(pts.shape)
+    views = rays.viewdirs[...,None,:].expand(pts.shape)
 
     return SamplerResult(pts, views, z_vals, deltas)
 
@@ -111,8 +112,9 @@ def importance_sampler(rays: Rays,
     deltas = z_vals[:, 1:] - z_vals[:, :-1] # (N_rays, N_samples_-1)
     delta_inf = 1e10 * torch.ones_like(deltas[:, :1]) # (N_rays, 1) the last delta is infinity
     deltas = torch.cat([deltas, delta_inf], -1)  # (N_rays, N_samples_)
+    deltas = deltas * torch.norm(rays_d[...,None,:], dim=-1)
 
-    views = rays_d[...,None,:].expand(pts.shape)
+    views = rays.viewdirs[...,None,:].expand(pts.shape)
     
     return SamplerResult(pts, views, z_vals, deltas)
 
