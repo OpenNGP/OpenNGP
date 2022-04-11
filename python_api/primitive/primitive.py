@@ -23,3 +23,9 @@ class Primitive(ABC):
 
     def parameters(self):
         raise NotImplementedError
+
+    def export(self):
+        raise NotImplementedError
+
+    def load(self, state_dict):
+        raise NotImplementedError

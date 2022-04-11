@@ -50,6 +50,14 @@ class Config:
     precrop_frac: float = 0.5
 
 
+def save_checkpoint(state_dict, save_path, device):
+    if exists(save_path):
+        last_state_dict = torch.load(save_path, map_location=device)
+        if last_state_dict['best_metric'] > state_dict['best_metric']:
+            return
+    torch.save(state_dict, save_path)
+
+
 def main(config_file):
     gin.parse_config_files_and_bindings([config_file], None)
     config = Config()
@@ -94,8 +102,20 @@ def main(config_file):
     if not exists(summary_dir): makedirs(summary_dir)
     writer = SummaryWriter(summary_dir)
 
-    total_loss = 0
-    init_step = 1  # state.optimizer.state.step + 1
+    best_ckpt = pjoin(config.exp_dir, 'ckpt_best.pth.tar')
+    if exists(best_ckpt):
+        state_dict = torch.load(best_ckpt, map_location=device)
+        optimizer.load_state_dict(state_dict['optimizer'])
+        init_step = state_dict['step']
+        total_loss = state_dict['total_loss']
+        config.lrate_decay = state_dict['lrate_decay']
+        config.lr_init = state_dict['lr_init']
+        ngp_coarse.load(state_dict['ngp_coarse'])
+        ngp_fine.load(state_dict['ngp_fine'])
+    else:
+        total_loss = 0
+        init_step = 1  # state.optimizer.state.step + 1
+
     pbar = tqdm.tqdm(total=config.max_steps, bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
     pbar.update(init_step-1)
 
@@ -177,6 +197,18 @@ def main(config_file):
             writer.add_image('test/rgb', img, step)
             writer.add_scalar("test/loss", test_loss, step)
             writer.add_scalar("test/psnr", test_psnr, step)
+
+            state = {
+                'step': step,
+                'total_loss': total_loss,
+                'best_metric': test_psnr,
+                'ngp_coarse': ngp_coarse.export(),
+                'ngp_fine': ngp_fine.export(),
+                'lrate_decay': config.lrate_decay,
+                'lr_init': config.lr_init,
+                'optimizer': optimizer
+            }
+            save_checkpoint(state, best_ckpt, device)
 
     writer.close()
     console.print('==> end fitting NGP')

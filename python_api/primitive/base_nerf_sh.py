@@ -1,12 +1,12 @@
-from .component.appearance import color
+from .component.appearance import color_sh
 from .component.geometry import sigma
 from .primitive import Primitive
 
 
 class BaseNeRF(Primitive):
     def __init__(self, multires=10, multires_views=4, netdepth=8, netwidth=256) -> None:
-        self.geometry = sigma.Sigma(multires, netdepth, netwidth, netwidth, [4])
-        self.appearance = color.Color(multires_views, netwidth, netwidth//2)
+        self.geometry = sigma.Sigma(multires, netdepth, netwidth, multires_views**2, [4])
+        self.appearance = color_sh.ColorSH(multires_views, multires_views**2, netwidth//2)
         pass
 
     def query_sigma(self, xyzs):
@@ -21,13 +21,3 @@ class BaseNeRF(Primitive):
 
     def parameters(self):
         return list(self.geometry.parameters()) + list(self.appearance.parameters())
-
-    def export(self):
-        return {
-            'geometry': self.geometry.state_dict(),
-            'appearance': self.appearance.state_dict()
-        }
-    
-    def load(self, state_dict):
-        self.geometry.load_state_dict(state_dict['geometry'])
-        self.appearance.load_state_dict(state_dict['appearance'])
