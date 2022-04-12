@@ -22,6 +22,7 @@ namespace ongp
                 array.push_back(d);
             }
         }
+        std::cout << array[0] << std::endl;
         return array;
     }
 
@@ -30,7 +31,13 @@ namespace ongp
     {
         int m = array_2d.size();
         int n = array_2d[0].size();
+
+        // Weird bug???
+        //auto options = torch::TensorOptions().dtype(torch::kF16);
+        //at::Tensor tensor = torch::from_blob(Linearize2d(array_2d).data(), {m,n});
+        std::cout << torch::from_blob(Linearize2d(array_2d).data(), {m,n}) << std::endl;
         return torch::from_blob(Linearize2d(array_2d).data(), {m,n});
+       // return tensor;
     }
 }
 

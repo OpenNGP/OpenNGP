@@ -11,7 +11,7 @@ namespace ongp
     class FrameDataset: public torch::data::Dataset<FrameDataset, Frame>
     {
     public:
-        explicit FrameDataset(const std::string& file_path);
+        FrameDataset(const std::string& root_path, const std::string& dataset);
 
         Frame get(size_t index) override;
 
@@ -22,6 +22,7 @@ namespace ongp
 
     protected:
         FrameDataList fd_list_;
+        std::string root_path_;
     };
 }
 

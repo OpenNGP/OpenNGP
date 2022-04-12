@@ -13,6 +13,8 @@ namespace ongp
     {
         img_path = j_["file_path"];
         mat44 = Array2dToTensor(j_["transform_matrix"].get<Array2d<float>>());
+        std::cout << j_["transform_matrix"].get<Array2d<float>>()[0] << std::endl;
+        std::cout << mat44 << std::endl;
     }
 
     void FrameDataList::Serialize()

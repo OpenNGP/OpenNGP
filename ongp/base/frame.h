@@ -14,6 +14,9 @@ namespace ongp
         Frame(const Camera& cam, const Image& img);
 
         SET_MEMBER_FUNC(Camera, cam)
+        GET_MEMBER_FUNC(Camera, cam)
+
+        SET_MEMBER_FUNC(Image, img)
         GET_MEMBER_FUNC(Image, img)
 
     protected:
