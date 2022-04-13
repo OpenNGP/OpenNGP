@@ -8,6 +8,9 @@ class Renderer:
     def __init__(self, pass_config: List[Tuple[str, Dict]]) -> None:
         self.passes = [RenderPass(*p) for p in pass_config]
 
+    def __repr__(self):
+        return '\n'.join([str(p) for p in self.passes])
+
     def render(self, rays: Rays, primitive: Primitive, context: Dict = {}) -> List[RenderPassResult]:
         outputs, ctx = [], context
         for renderpass in self.passes:

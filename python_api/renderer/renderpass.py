@@ -25,13 +25,18 @@ class RenderPass:
                  integrator: Tuple[str, Dict]) -> None:
         self.name = name
 
-        self.sampler = raymarcher[sampler[0]]
+        self.sampler = sampler[0]
         self.sampler_args = raymarcher.parameters(sampler[0])
         self.sampler_default_args = sampler[1]
 
-        self.integrator = rayintegrator[integrator[0]]
+        self.integrator = integrator[0]
         self.integrator_args = rayintegrator.parameters(integrator[0])
         self.integrator_default_args = integrator[1]
+
+    def __repr__(self):
+        return (f"[RenderPass]: {self.name}"
+                f" sampler={self.sampler}"
+                f" integrator={self.integrator}")
 
     def render_pixel(self, rays: Rays, primitive: Primitive, context: Dict):
         # render step
@@ -41,11 +46,14 @@ class RenderPass:
         sampler_ctx.update(context)
         sampler_ctx.update({'rays': rays})
         sampler_inputs = {k: sampler_ctx[k] for k in self.sampler_args}
-        sampler_result = self.sampler(**sampler_inputs)
+        sampler_result = raymarcher[self.sampler](**sampler_inputs)
 
         # 2. query infos from NGP
         sigmas, geo_features = primitive.query_sigma(sampler_result.xyzs)
-        rgbs = primitive.query_color(geo_features, sampler_result.views)
+        if 'rgbs' in self.integrator_args:  # save computation
+            rgbs = primitive.query_color(geo_features, sampler_result.views)
+        else:
+            rgbs = None        
 
         # 3. integrate infos into pixel
         integrator_ctx = {**self.integrator_default_args}
@@ -53,7 +61,7 @@ class RenderPass:
         integrator_ctx.update(sampler_result._asdict())
         integrator_ctx.update({'sigmas': sigmas, 'rgbs': rgbs})
         intgr_inputs = {k: integrator_ctx[k] for k in self.integrator_args}
-        weights, pixels = self.integrator(**intgr_inputs)
+        weights, pixels = rayintegrator[self.integrator](**intgr_inputs)
 
         return RenderPassResult(self.name,
                                 sampler_result,

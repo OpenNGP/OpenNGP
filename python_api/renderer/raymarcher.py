@@ -1,7 +1,8 @@
 import torch
 import numpy as np
 from collections import namedtuple
-from python_api.renderer.rays import Rays
+from python_api.renderer.raymarching import near_far_from_aabb
+from python_api.renderer.rays import Rays, RaysWithDepth
 from python_api.utils import FunctionRegistry
 
 
@@ -58,6 +59,15 @@ def sample_pdf(bins, weights, N_samples, det=False, pytest=False):
     return samples
 
 
+def delta_from_zval(z_vals, rays_d, delta_inf=1e10):
+    # Convert these values using volume rendering (Section 4)
+    deltas = z_vals[:, 1:] - z_vals[:, :-1] # (N_rays, N_samples_-1)
+    delta_inf = delta_inf * torch.ones_like(deltas[:, :1]) # (N_rays, 1) the last delta is infinity
+    deltas = torch.cat([deltas, delta_inf], -1)  # (N_rays, N_samples_)
+    deltas = deltas * torch.norm(rays_d[...,None,:], dim=-1)
+    return deltas
+
+
 def uniform_sampler(rays: Rays, N_samples: int, lindisp: bool, perturb: bool):
     near, far = rays.near, rays.far
     rays_o, rays_d = rays.origins, rays.directions
@@ -84,10 +94,7 @@ def uniform_sampler(rays: Rays, N_samples: int, lindisp: bool, perturb: bool):
     pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples, 3]
     
     # Convert these values using volume rendering (Section 4)
-    deltas = z_vals[:, 1:] - z_vals[:, :-1] # (N_rays, N_samples_-1)
-    delta_inf = 1e10 * torch.ones_like(deltas[:, :1]) # (N_rays, 1) the last delta is infinity
-    deltas = torch.cat([deltas, delta_inf], -1)  # (N_rays, N_samples_)
-    deltas = deltas * torch.norm(rays_d[...,None,:], dim=-1)
+    deltas = delta_from_zval(z_vals, rays_d)
 
     views = rays.viewdirs[...,None,:].expand(pts.shape)
 
@@ -109,17 +116,58 @@ def importance_sampler(rays: Rays,
     pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples + N_importance, 3]
 
     # Convert these values using volume rendering (Section 4)
-    deltas = z_vals[:, 1:] - z_vals[:, :-1] # (N_rays, N_samples_-1)
-    delta_inf = 1e10 * torch.ones_like(deltas[:, :1]) # (N_rays, 1) the last delta is infinity
-    deltas = torch.cat([deltas, delta_inf], -1)  # (N_rays, N_samples_)
-    deltas = deltas * torch.norm(rays_d[...,None,:], dim=-1)
+    deltas = delta_from_zval(z_vals, rays_d)
 
     views = rays.viewdirs[...,None,:].expand(pts.shape)
     
     return SamplerResult(pts, views, z_vals, deltas)
 
 
+def instant_ngp_sampler(rays: Rays, bound, num_steps, perturb):
+    rays_o, rays_d = rays.origins, rays.viewdirs  # rays.directions isn't normalized
+    device = rays_o.device
+    prefix = rays_o.shape[:-1]
+    rays_o = rays_o.contiguous().view(-1, 3)
+    rays_d = rays_d.contiguous().view(-1, 3)
+
+    N = rays_o.shape[0] # N = B * N, in fact
+    device = rays_o.device
+
+    # choose aabb
+    aabb = torch.Tensor([-bound, -bound, -bound, bound, bound, bound])
+    aabb = aabb.to(device)
+
+    # sample steps
+    nears, fars = near_far_from_aabb(rays_o, rays_d, aabb)
+    nears.unsqueeze_(-1)
+    fars.unsqueeze_(-1)
+
+    #print(f'nears = {nears.min().item()} ~ {nears.max().item()}, fars = {fars.min().item()} ~ {fars.max().item()}')
+
+    z_vals = torch.linspace(0.0, 1.0, num_steps, device=device).unsqueeze(0) # [1, T]
+    z_vals = z_vals.expand((N, num_steps)) # [N, T]
+    z_vals = nears + (fars - nears) * z_vals # [N, T], in [nears, fars]
+
+    # perturb z_vals
+    sample_dist = (fars - nears) / num_steps
+    if perturb:
+        z_vals = z_vals + (torch.rand(z_vals.shape, device=device) - 0.5) * sample_dist
+        #z_vals = z_vals.clamp(nears, fars) # avoid out of bounds xyzs.
+
+    # generate xyzs
+    pts = rays_o.unsqueeze(-2) + rays_d.unsqueeze(-2) * z_vals.unsqueeze(-1) # [N, 1, 3] * [N, T, 1] -> [N, T, 3]
+    pts = torch.min(torch.max(pts, aabb[:3]), aabb[3:]) # a manual clip.
+
+    # Convert these values using volume rendering (Section 4)
+    deltas = delta_from_zval(z_vals, rays_d, sample_dist)
+
+    views = rays.viewdirs[...,None,:].expand(pts.shape)
+
+    return SamplerResult(pts, views, z_vals, deltas)
+
+
 raymarcher = FunctionRegistry(
     uniform_sampler=uniform_sampler,
     importance_sampler=importance_sampler,
+    instant_ngp_sampler=instant_ngp_sampler,
 )
