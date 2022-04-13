@@ -2,6 +2,7 @@ import gin
 import numpy as np
 import torch
 import tqdm
+import shutil
 
 from tensorboardX import SummaryWriter
 from os import makedirs
@@ -26,6 +27,8 @@ def save_checkpoint(state_dict, save_path, device):
 def main(config_file):
     gin.parse_config_files_and_bindings([config_file], None)
     config = Config()
+    if not exists(config.exp_dir): makedirs(config.exp_dir)
+    shutil.copy(config_file, pjoin(config.exp_dir, 'config.gin'))
 
     print('==> build NGP and renderer')
     engine = Engine(config)

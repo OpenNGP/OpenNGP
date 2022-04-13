@@ -24,7 +24,7 @@ def sample_pdf(bins, weights, N_samples, det=False, pytest=False):
     # Take uniform samples
     if det:
         u = torch.linspace(0., 1., steps=N_samples, device=device)
-        u = u.expand(list(cdf.shape[:-1]) + [N_samples], device=device)
+        u = u.expand(list(cdf.shape[:-1]) + [N_samples])
     else:
         u = torch.rand(list(cdf.shape[:-1]) + [N_samples], device=device)
 
@@ -224,7 +224,7 @@ def ngp_sampler_with_depth(rays: RaysWithDepth, bound, num_steps, min_near, pert
     return SamplerResult(pts, views, z_vals, deltas)
 
 
-raymarcher = FunctionRegistry(
+sampler = FunctionRegistry(
     uniform_sampler=uniform_sampler,
     importance_sampler=importance_sampler,
     instant_ngp_sampler=instant_ngp_sampler,
