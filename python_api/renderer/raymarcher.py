@@ -15,6 +15,7 @@ SamplerResult = namedtuple(
 # Hierarchical sampling (section 5.2)
 def sample_pdf(bins, weights, N_samples, det=False, pytest=False):
     # Get pdf
+    device = weights.device
     weights = weights + 1e-5 # prevent nans
     pdf = weights / torch.sum(weights, -1, keepdim=True)
     cdf = torch.cumsum(pdf, -1)
@@ -22,10 +23,10 @@ def sample_pdf(bins, weights, N_samples, det=False, pytest=False):
 
     # Take uniform samples
     if det:
-        u = torch.linspace(0., 1., steps=N_samples)
-        u = u.expand(list(cdf.shape[:-1]) + [N_samples])
+        u = torch.linspace(0., 1., steps=N_samples, device=device)
+        u = u.expand(list(cdf.shape[:-1]) + [N_samples], device=device)
     else:
-        u = torch.rand(list(cdf.shape[:-1]) + [N_samples])
+        u = torch.rand(list(cdf.shape[:-1]) + [N_samples], device=device)
 
     # Pytest, overwrite u with numpy's fixed random numbers
     if pytest:
@@ -123,7 +124,7 @@ def importance_sampler(rays: Rays,
     return SamplerResult(pts, views, z_vals, deltas)
 
 
-def instant_ngp_sampler(rays: Rays, bound, num_steps, perturb):
+def instant_ngp_sampler(rays: Rays, bound, num_steps, min_near, perturb):
     rays_o, rays_d = rays.origins, rays.viewdirs  # rays.directions isn't normalized
     device = rays_o.device
     prefix = rays_o.shape[:-1]
@@ -138,7 +139,7 @@ def instant_ngp_sampler(rays: Rays, bound, num_steps, perturb):
     aabb = aabb.to(device)
 
     # sample steps
-    nears, fars = near_far_from_aabb(rays_o, rays_d, aabb)
+    nears, fars = near_far_from_aabb(rays_o, rays_d, aabb, min_near)
     nears.unsqueeze_(-1)
     fars.unsqueeze_(-1)
 
@@ -166,8 +167,66 @@ def instant_ngp_sampler(rays: Rays, bound, num_steps, perturb):
     return SamplerResult(pts, views, z_vals, deltas)
 
 
+def ngp_sampler_with_depth(rays: RaysWithDepth, bound, num_steps, min_near, perturb, epsilon):
+    rays_o, rays_d = rays.origins, rays.viewdirs  # rays.directions isn't normalized
+    device = rays_o.device
+    prefix = rays_o.shape[:-1]
+    rays_o = rays_o.contiguous().view(-1, 3)
+    rays_d = rays_d.contiguous().view(-1, 3)
+
+    N = rays_o.shape[0] # N = B * N, in fact
+    device = rays_o.device
+
+    # choose aabb
+    aabb = torch.Tensor([-bound, -bound, -bound, bound, bound, bound])
+    aabb = aabb.to(device)
+
+    # sample steps
+    nears, fars = near_far_from_aabb(rays_o, rays_d, aabb, min_near)
+    nears.unsqueeze_(-1)
+    fars.unsqueeze_(-1)
+
+    #print(f'nears = {nears.min().item()} ~ {nears.max().item()}, fars = {fars.min().item()} ~ {fars.max().item()}')
+
+    z_vals = torch.linspace(0.0, 1.0, num_steps, device=device).unsqueeze(0) # [1, T]
+    z_vals = z_vals.expand((N, num_steps)) # [N, T]
+    z_vals = nears + (fars - nears) * z_vals # [N, T], in [nears, fars]
+
+    # perturb z_vals
+    sample_dist = (fars - nears) / num_steps
+    if perturb:
+        z_vals = z_vals + (torch.rand(z_vals.shape, device=device) - 0.5) * sample_dist
+        #z_vals = z_vals.clamp(nears, fars) # avoid out of bounds xyzs.
+
+    # sample from depth prior, N(d_prior, epsilon)
+    extra_z_vals = torch.zeros_like(z_vals)
+    valid_depth = rays.depth[rays.mask]
+    m = torch.distributions.Normal(valid_depth, epsilon*torch.ones_like(valid_depth))
+    depth_samples = m.sample(torch.Size([num_steps]))
+    extra_z_vals[rays.mask.squeeze()] = depth_samples.T
+
+    # sample from
+    m = torch.distributions.Uniform(nears[~rays.mask], fars[~rays.mask])
+    pad_samples = m.sample(torch.Size([num_steps]))
+    extra_z_vals[~rays.mask.squeeze()] = pad_samples.T
+
+    z_vals, _ = torch.sort(torch.cat([z_vals, extra_z_vals], -1), -1)
+
+    # generate xyzs
+    pts = rays_o.unsqueeze(-2) + rays_d.unsqueeze(-2) * z_vals.unsqueeze(-1) # [N, 1, 3] * [N, T, 1] -> [N, T, 3]
+    pts = torch.min(torch.max(pts, aabb[:3]), aabb[3:]) # a manual clip.
+
+    # Convert these values using volume rendering (Section 4)
+    deltas = delta_from_zval(z_vals, rays_d, sample_dist)
+
+    views = rays.viewdirs[...,None,:].expand(pts.shape)
+
+    return SamplerResult(pts, views, z_vals, deltas)
+
+
 raymarcher = FunctionRegistry(
     uniform_sampler=uniform_sampler,
     importance_sampler=importance_sampler,
     instant_ngp_sampler=instant_ngp_sampler,
+    ngp_sampler_with_depth=ngp_sampler_with_depth
 )
