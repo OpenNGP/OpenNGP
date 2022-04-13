@@ -1,5 +1,5 @@
 Config.data_dir = '/home/asua/muyu/data/hd0/nerfingmvs_data/lego'
-Config.exp_dir = '/home/asua/muyu/data/hd0/nerfingmvs_data/openNGP_exps/lego/debug_w_fine_l2_no_weight_decay_crop_500_ray_d'
+Config.exp_dir = '/home/asua/muyu/data/hd0/nerfingmvs_data/openNGP_exps/lego/debug_baseline_w_sh'
 Config.dataset_loader = 'blender'
 Config.batching = 'single_image'
 Config.batch_size = 1024

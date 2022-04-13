@@ -1,0 +1,34 @@
+Config.data_dir = '/home/asua/muyu/data/hd0/nerfingmvs_data/fuyinshi_1'
+Config.exp_dir = '/home/asua/muyu/data/hd0/nerfingmvs_data/openNGP_exps/fuyinshi_1/debug_ngp_depth_shencoder_fix_bound'
+Config.dataset_loader = 'muyu'
+Config.torch_dataset = True
+Config.batching = 'single_image'
+Config.batch_size = 1024
+Config.near = 0.01 
+Config.far = 1.0
+Config.white_bkgd = False
+Config.max_steps = 500000
+Config.bound = 1.2
+Config.criterion = {
+    'name': 'PixelLossWithDepth',
+    'color_diff_type': 'l2', 
+    'depth_diff_type': 'huber',
+    'bound': 1.2
+}
+Config.pipelines = [
+    {
+        'name': 'ngp',
+        'arch': {'name': 'InstantNGP', 'bound': 1.2},
+        'renderpasses': [
+            (
+                'uniform',
+                ('instant_ngp_sampler', {
+                    'num_steps': 128,
+                    'perturb': True,
+                    'bound': 1.2
+                }),
+                ('volume_integrator', {})
+            )
+        ]
+    }
+]
