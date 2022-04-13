@@ -1,60 +1,18 @@
 import gin
-import dataclasses
 import numpy as np
 import torch
-import torch.optim as optim
 import tqdm
 
 from tensorboardX import SummaryWriter
-from torch.utils.data import DataLoader, Dataset
 from os import makedirs
 from os.path import exists, join as pjoin
-from rich.console import Console
 from python_api.app.engine import Engine
+from python_api.app.config import Config
 
 from python_api.metrics import Loss_factory
 from python_api.provider import get_dataset
 from python_api.provider.dataset_ngp import NeRFRayDataset
 from python_api.utils.data_helper import namedtuple_map
-
-
-@gin.configurable()
-@dataclasses.dataclass
-class Config:
-    """Configuration flags for everything."""
-    data_dir: str = ''  # data_dir
-    exp_dir: str = ''  # exp_dar
-    dataset_loader: str = 'multicam'  # The type of dataset loader to use.
-    torch_dataset: bool = False
-    batching: str = 'all_images'  # Batch composition, [single_image, all_images].
-    batch_size: int = 4096  # The number of rays/pixels in each batch.
-    factor: int = 0  # The downsample factor of images, 0 for no downsampling.
-    spherify: bool = False  # Set to True for spherical 360 scenes.
-    render_path: bool = False  # If True, render a path. Used only by LLFF.
-    llffhold: int = 8  # Use every Nth image for the test set. Used only by LLFF.
-    lr_init: float = 5e-4  # The initial learning rate.
-    lrate_decay: int = 500
-    grad_max_norm: float = 0.  # Gradient clipping magnitude, disabled if == 0.
-    grad_max_val: float = 0.  # Gradient clipping value, disabled if == 0.
-    max_steps: int = 200000  # The number of optimization steps.
-    save_every: int = 10000  # The number of steps to save a checkpoint.
-    print_every: int = 100  # The number of steps between reports to tensorboard.
-    gc_every: int = 10000  # The number of steps between garbage collections.
-    test_render_interval: int = 1  # The interval between images saved to disk.
-    disable_multiscale_loss: bool = False  # If True, disable multiscale loss.
-    randomized: bool = True  # Use randomized stratified sampling.
-    near: float = 2.  # Near plane distance.
-    far: float = 6.  # Far plane distance.
-    coarse_loss_mult: float = 0.1  # How much to downweight the coarse loss(es).
-    weight_decay_mult: float = 0.  # The multiplier on weight decay.
-    white_bkgd: bool = True  # If True, use white as the background (black o.w.).
-    render_passes: list = dataclasses.field(default_factory=list)
-    pipelines: list = dataclasses.field(default_factory=list)
-    criterion: dict = dataclasses.field(default_factory=dict)
-    precrop_iters: int = 0
-    precrop_frac: float = 0.5
-    load_depth: bool = False
-    bound: float = 1.0
 
 
 def save_checkpoint(state_dict, save_path, device):
@@ -68,15 +26,14 @@ def save_checkpoint(state_dict, save_path, device):
 def main(config_file):
     gin.parse_config_files_and_bindings([config_file], None)
     config = Config()
-    console = Console()
 
-    console.print('==> build NGP and renderer')
+    print('==> build NGP and renderer')
     engine = Engine(config)
     device = engine.device
 
     # torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
-    console.print('==> build dataset')
+    print('==> build dataset')
     if config.torch_dataset:
         dataset = NeRFRayDataset('train', config.data_dir, config)
         dataset = torch.utils.data.DataLoader(dataset, batch_size=config.batch_size, shuffle=True, num_workers=8)
@@ -84,10 +41,9 @@ def main(config_file):
         dataset = get_dataset('train', config.data_dir, config)
     val_dataset = get_dataset('test', config.data_dir, config)
 
-
-    console.print('==> init optimize routine')
+    print('==> init optimize routine')
     # criterion = torch.nn.HuberLoss(delta=0.1)
-    criterion = Loss_factory.build(config.criterion)
+    criterion = Loss_factory.build(**config.criterion)
     # criterion = torch.nn.MSELoss()
     # criterion_depth = torch.nn.HuberLoss(delta=0.1)
     img2mse = lambda x, y : torch.mean((x - y) ** 2)
@@ -118,7 +74,7 @@ def main(config_file):
     pbar = tqdm.tqdm(total=config.max_steps, bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
     pbar.update(step-1)
 
-    console.print('==> start fitting NGP')
+    print('==> start fitting NGP')
     # for step, batch in zip(range(init_step, config.max_steps + 1), dataset):
     for batch in dataset:
         if step >= config.max_steps + 1: break
@@ -184,16 +140,16 @@ def main(config_file):
                         lambda r: r[i:i + chunk],
                         test_rays
                     )
-                    rets_test = engine.run(chunk_rays, {'perturb': False})
+                    rets_test = engine.run_eval(chunk_rays, {'perturb': False})
                     results.append(rets_test[-1].pixels.colors)
                 test_pixels = torch.concat(results)
                 test_pixels = test_pixels.reshape((height, width, -1))
-                test_loss = criterion(test_pixels, test_pixels_gt).item()
+                # test_loss = criterion(test_pixels, test_pixels_gt).item()
                 test_psnr = mse2psnr(img2mse(test_pixels, test_pixels_gt))
                 test_psnr = test_psnr.item()
                 img = to8b(test_pixels.cpu().numpy()).transpose((2, 0, 1))
             writer.add_image('test/rgb', img, step)
-            writer.add_scalar("test/loss", test_loss, step)
+            # writer.add_scalar("test/loss", test_loss, step)
             writer.add_scalar("test/psnr", test_psnr, step)
 
             state = {
@@ -210,7 +166,7 @@ def main(config_file):
         step += 1
 
     writer.close()
-    console.print('==> end fitting NGP')
+    print('==> end fitting NGP')
     pass
 
 
