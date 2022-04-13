@@ -5,15 +5,17 @@ from python_api.primitive.component.module import encoder, regressor
 
 
 class ColorSH(nn.Module):
-    def __init__(self, N_degree, N_geo_emb, W) -> None:
+    def __init__(self, N_degree, N_geo_emb, D, W) -> None:
         super(ColorSH, self).__init__()
-        self.encoder = encoder.SphericalHarmonic(N_degree)
-        self.regressor = regressor.MLP(D=0,
+        # self.encoder = encoder.SphericalHarmonic(N_degree)
+        self.encoder = encoder.SHEncoder()
+        self.regressor = regressor.MLP(D=D,
                                        W=W,
                                        input_ch=self.encoder.output_ch+N_geo_emb,  # encoded dirs + geo features
                                        output_ch=3,  # rgb
                                        skip_connections=[],
-                                       act_on_last_layer=False)
+                                       act_on_last_layer=False,
+                                       bias=False)
 
     def forward(self, geo_features, views):
         view_inputs = self.encoder(views)

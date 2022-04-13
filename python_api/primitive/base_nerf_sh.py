@@ -3,10 +3,10 @@ from .component.geometry import sigma
 from .primitive import Primitive
 
 
-class BaseNeRF(Primitive):
+class BaseNeRFSH(Primitive):
     def __init__(self, multires=10, multires_views=4, netdepth=8, netwidth=256) -> None:
         self.geometry = sigma.Sigma(multires, netdepth, netwidth, multires_views**2, [4])
-        self.appearance = color_sh.ColorSH(multires_views, multires_views**2, netwidth//2)
+        self.appearance = color_sh.ColorSH(multires_views, multires_views**2, 0, netwidth//2)
         pass
 
     def query_sigma(self, xyzs):
