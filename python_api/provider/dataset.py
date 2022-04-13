@@ -26,10 +26,6 @@ from python_api.renderer.rays import Rays
 from python_api.utils.data_helper import namedtuple_map
 
 
-def get_dataset(split, train_dir, config):
-  return dataset_dict[config.dataset_loader](split, train_dir, config)
-
-
 def convert_to_ndc(origins, directions, focal, w, h, near=1.):
   """Convert a set of rays to NDC coordinates."""
   # Shift ray origins to near plane
@@ -445,6 +441,7 @@ class Muyu(Dataset):
     self.camtoworlds = np.stack(cams, axis=0)
     camera_angle_x = float(meta['camera_angle_x'])
     self.focal = .5 * self.w / np.tan(.5 * camera_angle_x)
+    self.frames = frames
     self.n_examples = self.camtoworlds.shape[0]
 
   def _generate_rays(self):
@@ -703,11 +700,3 @@ class LLFF(Dataset):
     if self.split == 'test':
       self.render_poses = new_poses[:, :3, :4]
     return poses_reset
-
-
-dataset_dict = {
-    'blender': Blender,
-    'llff': LLFF,
-    'multicam': Multicam,
-    'muyu': Muyu,
-}
