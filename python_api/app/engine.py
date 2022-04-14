@@ -93,3 +93,55 @@ class Engine:
             loss = loss_dict
         loss_stat['loss'] = loss.item()
         return loss, loss_stat
+
+    def draw(self, rays, chunk_size):
+        # chunk = val_dataset.batch_size
+        height, width = rays[0].shape[:2]
+        num_rays = height * width
+        test_rays = namedtuple_map(
+            lambda r: r.reshape((num_rays, -1)),
+            rays
+        )
+        rgbs, depths = [], []
+        with torch.no_grad():
+            for i in range(0, num_rays, chunk_size):
+                # pylint: disable=cell-var-from-loop
+                chunk_rays = namedtuple_map(
+                    lambda r: r[i:i + chunk_size],
+                    test_rays
+                )
+                rets_test = self.run_eval(chunk_rays, {'perturb': False})
+                rgbs.append(rets_test[-1].pixels.colors)
+                depths.append(rets_test[-1].pixels.depths)
+            img_rgb = torch.concat(rgbs)
+            img_rgb = img_rgb.reshape((height, width, -1))
+            img_depth = torch.concat(depths)
+            img_depth = img_depth.reshape((height, width, -1))
+        return img_rgb, img_depth
+
+    @staticmethod
+    def visualize_depth(depth, mask=None, depth_min=None, depth_max=None, direct=False):
+        """Visualize the depth map with colormap.
+        Rescales the values so that depth_min and depth_max map to 0 and 1,
+        respectively.
+        """
+        import cv2
+        if not direct:
+            depth = 1.0 / (depth + 1e-6)
+        invalid_mask = np.logical_or(np.isnan(depth), np.logical_not(np.isfinite(depth)))
+        if mask is not None:
+            invalid_mask += np.logical_not(mask)
+        if depth_min is None:
+            depth_min = np.percentile(depth[np.logical_not(invalid_mask)], 5)
+        if depth_max is None:
+            depth_max = np.percentile(depth[np.logical_not(invalid_mask)], 95)
+        depth[depth < depth_min] = depth_min
+        depth[depth > depth_max] = depth_max
+        depth[invalid_mask] = depth_max
+
+        depth_scaled = (depth - depth_min) / (depth_max - depth_min)
+        depth_scaled_uint8 = np.uint8(depth_scaled * 255)
+        depth_color = cv2.applyColorMap(depth_scaled_uint8, cv2.COLORMAP_MAGMA)
+        depth_color[invalid_mask.squeeze(), :] = 0
+
+        return cv2.cvtColor(depth_color, cv2.COLOR_BGR2RGB)

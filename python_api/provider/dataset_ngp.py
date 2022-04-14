@@ -207,9 +207,11 @@ class NeRFDataset(Dataset):
 
             else:
                 if type == 'train':
-                    frames = frames[0:]
+                    mid = len(frames) // 2
+                    frames = frames[:mid] + frames[mid+1:]
                 elif type == 'valid':
-                    frames = frames[:1]
+                    mid = len(frames) // 2
+                    frames = frames[mid:mid+1]
 
                 per_img_depth_scale = transform.get('per_img_depth_scale', {})
 
@@ -504,7 +506,8 @@ class NeRFRayDataset(Dataset):
         ray_d = ray_d / np.linalg.norm(ray_d)
         rgb = self.img_dataset.images[img_idx][i, j]
         depth = self.img_dataset.depths[img_idx][[i], [j]]
-        ray_depth = depth / np.dot(ray_d, c2w[:3, 2])
+        depth_coef = np.dot(ray_d, c2w[:3, 2])
+        ray_depth = depth / depth_coef
         mask = self.img_dataset.masks[img_idx][[i], [j]]
 
         return {
@@ -516,7 +519,7 @@ class NeRFRayDataset(Dataset):
                                   ray_o,
                                   ray_d,
                                   ray_d,
-                                  0,
+                                  depth_coef,
                                   0,
                                   0,
                                   0,

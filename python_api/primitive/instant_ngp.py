@@ -18,6 +18,7 @@ class InstantNGP(Primitive):
     def to(self, device):
         self.appearance.to(device)
         self.geometry.to(device)
+        self.geometry.aabb = self.geometry.aabb.to(device)
 
     def export(self):
         return {

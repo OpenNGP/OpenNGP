@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from python_api.primitive.component.module import encoder, regressor
 
@@ -13,6 +14,7 @@ class HashGrid(nn.Module):
                                        output_ch=1+15,
                                        skip_connections=[],
                                        bias=False)
+        self.aabb = torch.Tensor([-bound,-bound,-bound,bound,bound,bound])
 
     def forward(self, xyzs):
         inputs = self.encoder(xyzs, self.bound)

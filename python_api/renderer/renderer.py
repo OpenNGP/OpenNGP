@@ -12,7 +12,7 @@ class Renderer:
         return '\n'.join([str(p) for p in self.passes])
 
     def render(self, rays: Rays, primitive: Primitive, context: Dict = {}) -> List[RenderPassResult]:
-        outputs, ctx = [], context
+        outputs, ctx = [], {**context}
         for renderpass in self.passes:
             rets = renderpass.render_pixel(rays, primitive, ctx)
             ctx = rets._asdict()

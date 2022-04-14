@@ -32,12 +32,7 @@ def main(config_file):
 
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
-    print('==> build dataset')
-    config.render_path = True
-    config.batch_size = 2048
-    val_dataset = get_dataset('test', config.data_dir, config)
-
-    eval_save_dir = pjoin(config.exp_dir, "eval")
+    eval_save_dir = pjoin(config.exp_dir, config.eval_dir)
     if not exists(eval_save_dir): makedirs(eval_save_dir)
 
     best_ckpt = pjoin(config.exp_dir, 'ckpt_best.pth.tar')
@@ -48,36 +43,24 @@ def main(config_file):
     else:
         raise ValueError
 
+    print('==> build dataset')
+    config.render_path = True
+    config.batch_size = 2048
+    val_dataset = get_dataset('test', config.data_dir, config)
+
     pbar = tqdm.tqdm(total=val_dataset.size, bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
     pbar.update(init_step-1)
 
     print('==> start evaluating NGP')
     for step, test_batch in zip(range(init_step, val_dataset.size + 1), val_dataset):
-        chunk = val_dataset.batch_size
         test_batch = engine.prepare_data(test_batch)
-        test_rays = test_batch['rays']
-        height, width = test_rays[0].shape[:2]
-        num_rays = height * width
-        test_rays = namedtuple_map(
-            lambda r: r.reshape((num_rays, -1)),
-            test_rays
-        )
-        results = []
-        with torch.no_grad():
-            for i in range(0, num_rays, chunk):
-                # pylint: disable=cell-var-from-loop
-                chunk_rays = namedtuple_map(
-                    lambda r: r[i:i + chunk],
-                    test_rays
-                )
-                rets_test = engine.run_eval(chunk_rays, {'perturb': False})
-                results.append(rets_test[-1].pixels.colors)
-            test_pixels = torch.concat(results)
-            test_pixels = test_pixels.reshape((height, width, -1))
-            img = (test_pixels.detach().cpu().numpy() * 255).astype(np.uint8)
-        
-        # path_depth = pjoin(eval_save_dir, f'{i:04d}_depth.png')
-        Image.fromarray(img).save(pjoin(eval_save_dir, f'{step-1:04d}.png'))
+        rgb, depth = engine.draw(test_batch['rays'], val_dataset.batch_size)
+
+        rgb = (rgb.detach().cpu().numpy() * 255).astype(np.uint8)
+        Image.fromarray(rgb).save(pjoin(eval_save_dir, f'{step-1:04d}.png'))
+
+        depth = engine.visualize_depth(depth)
+        Image.fromarray(depth).save(pjoin(eval_save_dir, f'{step-1:04d}_depth.png'))
         pbar.update()
 
     print('==> end evaluating NGP')

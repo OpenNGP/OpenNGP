@@ -124,7 +124,7 @@ def importance_sampler(rays: Rays,
     return SamplerResult(pts, views, z_vals, deltas)
 
 
-def instant_ngp_sampler(rays: Rays, bound, num_steps, min_near, perturb):
+def instant_ngp_sampler(rays: Rays, primitive, num_steps, min_near, perturb):
     rays_o, rays_d = rays.origins, rays.viewdirs  # rays.directions isn't normalized
     device = rays_o.device
     prefix = rays_o.shape[:-1]
@@ -135,8 +135,7 @@ def instant_ngp_sampler(rays: Rays, bound, num_steps, min_near, perturb):
     device = rays_o.device
 
     # choose aabb
-    aabb = torch.Tensor([-bound, -bound, -bound, bound, bound, bound])
-    aabb = aabb.to(device)
+    aabb = primitive.geometry.aabb
 
     # sample steps
     nears, fars = near_far_from_aabb(rays_o, rays_d, aabb, min_near)
@@ -167,7 +166,7 @@ def instant_ngp_sampler(rays: Rays, bound, num_steps, min_near, perturb):
     return SamplerResult(pts, views, z_vals, deltas)
 
 
-def ngp_sampler_with_depth(rays: RaysWithDepth, bound, num_steps, min_near, perturb, epsilon):
+def ngp_sampler_with_depth(rays: RaysWithDepth, primitive, num_steps, min_near, perturb, epsilon):
     rays_o, rays_d = rays.origins, rays.viewdirs  # rays.directions isn't normalized
     device = rays_o.device
     prefix = rays_o.shape[:-1]
@@ -178,8 +177,7 @@ def ngp_sampler_with_depth(rays: RaysWithDepth, bound, num_steps, min_near, pert
     device = rays_o.device
 
     # choose aabb
-    aabb = torch.Tensor([-bound, -bound, -bound, bound, bound, bound])
-    aabb = aabb.to(device)
+    aabb = primitive.geometry.aabb
 
     # sample steps
     nears, fars = near_far_from_aabb(rays_o, rays_d, aabb, min_near)
@@ -224,7 +222,7 @@ def ngp_sampler_with_depth(rays: RaysWithDepth, bound, num_steps, min_near, pert
     return SamplerResult(pts, views, z_vals, deltas)
 
 
-sampler = FunctionRegistry(
+raysampler = FunctionRegistry(
     uniform_sampler=uniform_sampler,
     importance_sampler=importance_sampler,
     instant_ngp_sampler=instant_ngp_sampler,

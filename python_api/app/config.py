@@ -8,6 +8,7 @@ class Config:
     """Configuration flags for everything."""
     data_dir: str = ''  # data_dir
     exp_dir: str = ''  # exp_dar
+    eval_dir: str = 'eval'
     dataset_loader: str = 'multicam'  # The type of dataset loader to use.
     torch_dataset: bool = False
     batching: str = 'all_images'  # Batch composition, [single_image, all_images].

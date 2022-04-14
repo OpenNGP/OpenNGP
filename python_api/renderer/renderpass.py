@@ -3,7 +3,7 @@ from collections import namedtuple
 
 from python_api.primitive.primitive import Primitive
 from .integrator import rayintegrator
-from .sampler import sampler
+from .raysampler import raysampler
 from .rays import Rays
 
 RenderPassResult = namedtuple(
@@ -26,7 +26,7 @@ class RenderPass:
         self.name = name
 
         self.sampler = sampler[0]
-        self.sampler_args = sampler.parameters(sampler[0])
+        self.sampler_args = raysampler.parameters(sampler[0])
         self.sampler_default_args = sampler[1]
 
         self.integrator = integrator[0]
@@ -40,13 +40,14 @@ class RenderPass:
 
     def render_pixel(self, rays: Rays, primitive: Primitive, context: Dict):
         # render step
+        context['primitive'] = primitive
 
         # 1. sample pts along ray
         sampler_ctx = {**self.sampler_default_args}
         sampler_ctx.update(context)
         sampler_ctx.update({'rays': rays})
         sampler_inputs = {k: sampler_ctx[k] for k in self.sampler_args}
-        sampler_result = sampler[self.sampler](**sampler_inputs)
+        sampler_result = raysampler[self.sampler](**sampler_inputs)
 
         # 2. query infos from NGP
         sigmas, geo_features = primitive.query_sigma(sampler_result.xyzs)

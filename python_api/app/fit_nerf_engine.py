@@ -7,6 +7,7 @@ import shutil
 from tensorboardX import SummaryWriter
 from os import makedirs
 from os.path import exists, join as pjoin
+from PIL import Image
 from python_api.app.engine import Engine
 from python_api.app.config import Config
 
@@ -60,6 +61,8 @@ def main(config_file):
     summary_dir = pjoin(config.exp_dir, "run")
     if not exists(summary_dir): makedirs(summary_dir)
     writer = SummaryWriter(summary_dir)
+    valid_dir = pjoin(config.exp_dir, "validation")
+    if not exists(valid_dir): makedirs(valid_dir)
 
     best_ckpt = pjoin(config.exp_dir, 'ckpt_best.pth.tar')
     if exists(best_ckpt):
@@ -117,7 +120,8 @@ def main(config_file):
         total_loss += loss_val
 
         if step % config.print_every == 0:
-            writer.add_scalar("train/loss", loss_val, step)
+            for loss_k, loss_v in loss_stat.items():
+                writer.add_scalar(f"train/{loss_k}", loss_v, step)
             writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], step)
             writer.add_scalar("train/psnr", psnr, step)
             pbar.set_description(f"loss={loss_val:.4f} ({total_loss/step:.4f}), psnr={psnr:.4f}, lr={optimizer.param_groups[0]['lr']:.6f}")
@@ -128,32 +132,20 @@ def main(config_file):
             test_batch = engine.prepare_data(test_batch)
             test_rays, test_pixels_gt = test_batch['rays'], test_batch['pixels']
 
-            chunk = val_dataset.batch_size
-            height, width = test_rays[0].shape[:2]
-            num_rays = height * width
-            test_rays = namedtuple_map(
-                lambda r: r.reshape((num_rays, -1)),
-                test_rays
-            )
-            results = []
-            with torch.no_grad():
-                for i in range(0, num_rays, chunk):
-                    # pylint: disable=cell-var-from-loop
-                    chunk_rays = namedtuple_map(
-                        lambda r: r[i:i + chunk],
-                        test_rays
-                    )
-                    rets_test = engine.run_eval(chunk_rays, {'perturb': False})
-                    results.append(rets_test[-1].pixels.colors)
-                test_pixels = torch.concat(results)
-                test_pixels = test_pixels.reshape((height, width, -1))
-                # test_loss = criterion(test_pixels, test_pixels_gt).item()
-                test_psnr = mse2psnr(img2mse(test_pixels, test_pixels_gt))
-                test_psnr = test_psnr.item()
-                img = to8b(test_pixels.cpu().numpy()).transpose((2, 0, 1))
-            writer.add_image('test/rgb', img, step)
+            test_pixels, depth = engine.draw(test_rays, val_dataset.batch_size)
+            depth = engine.visualize_depth(depth.cpu().numpy())
+
+            # test_loss = criterion(test_pixels, test_pixels_gt).item()
+            test_psnr = mse2psnr(img2mse(test_pixels, test_pixels_gt))
+            test_psnr = test_psnr.item()
+            img = to8b(test_pixels.cpu().numpy())
+            writer.add_image('test/rgb', img.transpose((2, 0, 1)), step)
+            writer.add_image('test/depth', depth.transpose((2, 0, 1)), step)
             # writer.add_scalar("test/loss", test_loss, step)
             writer.add_scalar("test/psnr", test_psnr, step)
+
+            Image.fromarray(img).save(pjoin(valid_dir, f'{step-1:04d}.png'))
+            Image.fromarray(depth).save(pjoin(valid_dir, f'{step-1:04d}_depth.png'))
 
             state = {
                 'step': step,
