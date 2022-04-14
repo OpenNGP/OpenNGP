@@ -13,4 +13,9 @@ inline const Type& Variable() const         \
     return Variable##_;                     \
 }                                           \
 
+#define SET_GET_MEMBER_FUNC(Type, Variable)  \
+SET_MEMBER_FUNC(Type, Variable)              \
+GET_MEMBER_FUNC(Type, Variable)              \
+
+
 #endif // ONGP_BASE_MACROS_H_
