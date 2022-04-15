@@ -117,7 +117,7 @@ class Engine:
             img_rgb = img_rgb.reshape((height, width, -1))
             img_depth = torch.concat(depths)
             img_depth = img_depth.reshape((height, width, -1))
-        return img_rgb, img_depth
+        return img_rgb, img_depth*rays.depth_cos
 
     @staticmethod
     def visualize_depth(depth, mask=None, depth_min=None, depth_max=None, direct=False):

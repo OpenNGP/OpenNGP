@@ -59,7 +59,7 @@ def main(config_file):
         rgb = (rgb.detach().cpu().numpy() * 255).astype(np.uint8)
         Image.fromarray(rgb).save(pjoin(eval_save_dir, f'{step-1:04d}.png'))
 
-        depth = engine.visualize_depth(depth)
+        depth = engine.visualize_depth(depth.cpu().numpy())
         Image.fromarray(depth).save(pjoin(eval_save_dir, f'{step-1:04d}_depth.png'))
         pbar.update()
 

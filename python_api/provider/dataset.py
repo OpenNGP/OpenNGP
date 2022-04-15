@@ -22,7 +22,7 @@ import numpy as np
 from os import listdir
 from os.path import exists, join as pjoin
 from PIL import Image
-from python_api.renderer.rays import Rays
+from python_api.renderer.rays import Rays, RaysWithDepthCos
 from python_api.utils.data_helper import namedtuple_map
 
 
@@ -60,6 +60,7 @@ class Dataset(threading.Thread):
     self.data_dir = data_dir
     self.near = config.near
     self.far = config.far
+    self.lazy_ray = config.lazy_ray
     if split == 'train':
       self._train_init(config)
     elif split == 'test':
@@ -138,7 +139,8 @@ class Dataset(threading.Thread):
 
   def _test_init(self, config):
     self._load_renderings(config)
-    self._generate_rays()
+    if not self.lazy_ray:
+      self._generate_rays()
     self.it = 0
 
   def _next_train(self):
@@ -181,6 +183,13 @@ class Dataset(threading.Thread):
     idx = self.it
     self.it = (self.it + 1) % self.n_examples
 
+    if self.lazy_ray:
+      rays = self._generate_rays_img(idx)
+      data = {'rays': namedtuple_map(lambda r: r[0], rays)}
+      if not self.render_path:
+        data['pixels'] = self.images[idx]
+      return data
+
     if self.render_path:
       return {'rays': namedtuple_map(lambda r: r[idx], self.render_rays)}
     else:
@@ -189,8 +198,7 @@ class Dataset(threading.Thread):
           'rays': namedtuple_map(lambda r: r[idx], self.rays)
       }
 
-  # TODO(bydeng): Swap this function with a more flexible camera model.
-  def _generate_rays(self):
+  def _generate_rays_from_cams(self, camtoworlds):
     """Generating rays for all images. coordinate [right|up|backward]"""
     x, y = np.meshgrid(  # pylint: disable=unbalanced-tuple-unpacking
         np.arange(self.w, dtype=np.float32),  # X-Axis (columns)
@@ -201,8 +209,8 @@ class Dataset(threading.Thread):
          -(y - self.h * 0.5 + 0.5) / self.focal, -np.ones_like(x)],
         axis=-1)
     directions = ((camera_dirs[None, ..., None, :] *
-                   self.camtoworlds[:, None, None, :3, :3]).sum(axis=-1))
-    origins = np.broadcast_to(self.camtoworlds[:, None, None, :3, -1],
+                   camtoworlds[:, None, None, :3, :3]).sum(axis=-1))
+    origins = np.broadcast_to(camtoworlds[:, None, None, :3, -1],
                               directions.shape)
     viewdirs = directions / np.linalg.norm(directions, axis=-1, keepdims=True)
 
@@ -215,15 +223,27 @@ class Dataset(threading.Thread):
 
     radii = dx[..., None] * 2 / np.sqrt(12)
 
+    depth_cos = -(viewdirs*camtoworlds[:, None, None, :3, 2]).sum(axis=-1)
+
     ones = np.ones_like(origins[..., :1])
-    self.rays = Rays(
+    return RaysWithDepthCos(
         origins=origins,
         directions=directions,
         viewdirs=viewdirs,
         radii=radii,
         lossmult=ones,
         near=ones * self.near,
-        far=ones * self.far)
+        far=ones * self.far,
+        depth_cos=depth_cos[..., None])
+
+  def _generate_rays_img(self, idx):
+    """Generating rays for all images. coordinate [right|up|backward]"""
+    return self._generate_rays_from_cams(self.camtoworlds[idx:idx+1])
+
+  # TODO(bydeng): Swap this function with a more flexible camera model.
+  def _generate_rays(self):
+    """Generating rays for all images. coordinate [right|up|backward]"""
+    return self._generate_rays_from_cams(self.camtoworlds)
 
 
 class Multicam(Dataset):

@@ -96,7 +96,8 @@ class PixelLossWithDepthAndSight(nn.Module):
 class PixelLossWithSightAndNear(nn.Module):
     def __init__(self, color_diff_type, depth_diff_type, bound, epsilon, decay) -> None:
         super(PixelLossWithSightAndNear, self).__init__()
-        self.color = PixelLoss(color_diff_type)
+        # self.color = PixelLoss(color_diff_type)
+        self.color = PixelLossWithDepth(color_diff_type, depth_diff_type, bound)
         self.epsilon = epsilon
         self.decay = decay
         self.step = 0

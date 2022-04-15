@@ -38,7 +38,8 @@ class Config:
     pipelines: list = dataclasses.field(default_factory=list)
     eval_pipelines: list = dataclasses.field(default_factory=list)
     criterion: dict = dataclasses.field(default_factory=dict)
-    precrop_iters: int = 0
+    precrop_iters: int = 0  # crop center for early training
     precrop_frac: float = 0.5
+    lazy_ray: bool = False  # lazy generate ray to save memory
     load_depth: bool = False
     bound: float = 1.0

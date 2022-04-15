@@ -106,8 +106,13 @@ def importance_sampler(rays: Rays,
                        samples: SamplerResult,  # samples from last pass
                        weights,
                        N_importance,
+                       use_norm_dir,
                        perturb):
-    rays_o, rays_d = rays.origins, rays.directions
+    rays_o = rays.origins
+    if use_norm_dir:
+        rays_d = rays.viewdirs
+    else:
+        rays_d = rays.directions
     z_vals = samples.z_vals
     z_vals_mid = .5 * (z_vals[...,1:] + z_vals[...,:-1])
     z_samples = sample_pdf(z_vals_mid, weights[...,1:-1], N_importance, det=(perturb==0.))

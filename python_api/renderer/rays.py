@@ -13,6 +13,19 @@ Rays = namedtuple(
     )
 )
 
+RaysWithDepthCos = namedtuple(
+    'RaysWithDepthCos',
+    (
+        'origins',
+        'directions',
+        'viewdirs',
+        'radii',
+        'lossmult',
+        'near',
+        'far',
+        'depth_cos'
+    )
+)
 
 RaysWithDepth = namedtuple(
     'RaysWithDepth',
