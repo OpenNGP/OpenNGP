@@ -5,6 +5,8 @@
 
 namespace ongp
 {
+    namespace 
+    {
     template <class T>
     using Array1d = std::vector<T>;
 
@@ -33,6 +35,7 @@ namespace ongp
 
         // torch::from_blob do not copy original data buffer!
         return torch::from_blob(Linearize2d(array_2d).data(), {m,n}).clone();
+    }
     }
 }
 
