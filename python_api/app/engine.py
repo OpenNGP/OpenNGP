@@ -65,20 +65,6 @@ class Engine:
         else:
             return self.execute_pipeline(self.eval_pipelines, rays, context)
 
-    def prepare_data(self, batch):
-        device = self.device
-        if isinstance(batch['rays'].origins, np.ndarray):
-            map_func = lambda r: torch.from_numpy(r).to(device, non_blocking=True)
-        else:
-            map_func = lambda r: r.to(device, non_blocking=True)
-
-        for k, v in batch.items():
-            if isinstance(v, tuple):
-                batch[k] = namedtuple_map(map_func, v)
-            else:
-                batch[k] = map_func(v)
-        return batch
-
     def parse_loss_info(self, loss_dict):
         loss = None
         loss_stat = {}

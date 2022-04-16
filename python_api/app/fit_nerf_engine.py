@@ -12,9 +12,7 @@ from python_api.app.engine import Engine
 from python_api.app.config import Config
 
 from python_api.metrics import Loss_factory
-from python_api.provider import get_dataset
-from python_api.provider.dataset_ngp import NeRFRayDataset
-from python_api.utils.data_helper import namedtuple_map
+from python_api.provider import get_dataset, prepare_data, DataTransformer
 
 
 def save_checkpoint(state_dict, save_path, device):
@@ -38,11 +36,8 @@ def main(config_file):
     # torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
     print('==> build dataset')
-    if config.torch_dataset:
-        dataset = NeRFRayDataset('train', config.data_dir, config)
-        dataset = torch.utils.data.DataLoader(dataset, batch_size=config.batch_size, shuffle=True, num_workers=8)
-    else:
-        dataset = get_dataset('train', config.data_dir, config)
+    dataset = get_dataset('train', config.data_dir, config)
+    data_trans = DataTransformer(dataset, device, config)
     val_dataset = get_dataset('test', config.data_dir, config)
 
     print('==> init optimize routine')
@@ -84,7 +79,8 @@ def main(config_file):
     # for step, batch in zip(range(init_step, config.max_steps + 1), dataset):
     for batch in dataset:
         if step >= config.max_steps + 1: break
-        batch = engine.prepare_data(batch)
+
+        batch = data_trans.prepare_data(batch)
         rays, pixels_gt = batch['rays'], batch['pixels']
         optimizer.zero_grad()
         rets = engine.run(rays)
@@ -92,22 +88,12 @@ def main(config_file):
         loss_dict = criterion(rets, batch)
         loss, loss_stat = engine.parse_loss_info(loss_dict)
 
-        # # color
-        # for ret in rets:
-        #     loss += criterion(ret.pixels.colors, pixels_gt)
-        # # depth
-        # for ret in rets:
-        #     pred_depth = ret.pixels.depths[..., None][rays.mask]
-        #     gt_depth = rays.depth[rays.mask]
-        #     loss += criterion_depth(pred_depth, gt_depth) / config.bound
-
         psnr = mse2psnr(img2mse(rets[-1].pixels.colors, pixels_gt))
         psnr = psnr.item()
 
         loss.backward()
         optimizer.step()
 
-        # scheduler.step()
         # NOTE: IMPORTANT!
         ###   update learning rate   ###
         decay_rate = 0.1
@@ -129,7 +115,7 @@ def main(config_file):
 
         if step % config.save_every == 0:
             test_batch = next(val_dataset)
-            test_batch = engine.prepare_data(test_batch)
+            test_batch = prepare_data(test_batch, engine.device)
             test_rays, test_pixels_gt = test_batch['rays'], test_batch['pixels']
 
             test_pixels, depth = engine.draw(test_rays, val_dataset.batch_size)

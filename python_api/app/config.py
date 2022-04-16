@@ -43,3 +43,6 @@ class Config:
     lazy_ray: bool = False  # lazy generate ray to save memory
     load_depth: bool = False
     bound: float = 1.0
+    refine_exposure: bool = False
+    refine_intrinsic: bool = False
+    refine_extrinsic: bool = False

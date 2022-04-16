@@ -10,8 +10,7 @@ from PIL import Image
 from python_api.app.engine import Engine
 from python_api.app.config import Config
 
-from python_api.provider import get_dataset
-from python_api.utils.data_helper import namedtuple_map
+from python_api.provider import get_dataset, prepare_data
 
 
 def save_checkpoint(state_dict, save_path, device):
@@ -53,7 +52,7 @@ def main(config_file):
 
     print('==> start evaluating NGP')
     for step, test_batch in zip(range(init_step, val_dataset.size + 1), val_dataset):
-        test_batch = engine.prepare_data(test_batch)
+        test_batch = prepare_data(test_batch, engine.device)
         rgb, depth = engine.draw(test_batch['rays'], val_dataset.batch_size)
 
         rgb = (rgb.detach().cpu().numpy() * 255).astype(np.uint8)
