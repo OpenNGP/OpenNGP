@@ -6,5 +6,9 @@
 
 namespace ongp
 {
+    class Primitive
+    {
+
+    };
 }
 

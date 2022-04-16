@@ -1,10 +1,12 @@
-#ifndef ONGP_PRIMITIVE_BASE_NERF_H_
-#define ONGP_PRIMITIVE_BASE_NERF_H_
+#pragma one
 
 #include <torch/torch.h>
 
 namespace ongp
 {
+    class BaseNeRF
+    {
+
+    };
 }
 
-#endif // ONGP_PRIMITIVE_BASE_NERF_H_
