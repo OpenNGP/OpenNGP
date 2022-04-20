@@ -39,6 +39,11 @@ class _near_far_from_aabb(Function):
 
         return nears, fars
 
+    @staticmethod
+    @custom_bwd
+    def backward(ctx, grad_nears, grad_fars):
+        return None, None, None, None
+        
 near_far_from_aabb = _near_far_from_aabb.apply
 
 # ----------------------------------------
