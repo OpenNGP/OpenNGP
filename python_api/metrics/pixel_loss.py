@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch_scatter
 
 from typing import List
+from python_api.metrics import Loss_factory
 from python_api.renderer.renderpass import RenderPassResult
 
 
