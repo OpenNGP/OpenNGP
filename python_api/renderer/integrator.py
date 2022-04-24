@@ -27,8 +27,13 @@ def depth_integrator(sigmas, deltas, z_vals):
     return weights, Pixel(None, depths)
 
 
+def pass_through_integrator(sigmas, deltas, z_vals):
+    return None, Pixel(None, None)
+
+
 rayintegrator = FunctionRegistry(
     volume_integrator=volume_integrator,
     depth_integrator=depth_integrator,
-    weight_integrator=integrate_weight
+    weight_integrator=integrate_weight,
+    pass_through_integrator=pass_through_integrator
 )

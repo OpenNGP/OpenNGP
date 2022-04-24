@@ -227,9 +227,18 @@ def ngp_sampler_with_depth(rays: RaysWithDepth, primitive, num_steps, min_near, 
     return SamplerResult(pts, views, z_vals, deltas)
 
 
+def sparsity_sampler(rays: RaysWithDepth, primitive, n_sp):
+    device = rays.origins.device
+    bound = primitive.geometry.bound
+    sp_points = torch.empty((n_sp, 3), device=device)
+    sp_points.uniform_(-bound, bound)
+    return SamplerResult(sp_points, None, None, None)
+
+
 raysampler = FunctionRegistry(
     uniform_sampler=uniform_sampler,
     importance_sampler=importance_sampler,
     instant_ngp_sampler=instant_ngp_sampler,
-    ngp_sampler_with_depth=ngp_sampler_with_depth
+    ngp_sampler_with_depth=ngp_sampler_with_depth,
+    sparsity_sampler=sparsity_sampler
 )
