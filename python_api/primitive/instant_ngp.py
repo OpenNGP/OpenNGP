@@ -4,8 +4,10 @@ from .primitive import Primitive
 
 
 class InstantNGP(Primitive):
-    def __init__(self, bound) -> None:
-        self.geometry = HashGrid(bound)
+    def __init__(self, bound, aabb=None) -> None:
+        if aabb is None:
+            aabb = [-bound, -bound, -bound, bound, bound, bound]
+        self.geometry = HashGrid(bound, aabb)
         self.appearance = ColorSH(4, 15, 2, 64)
         pass
 

@@ -4,7 +4,7 @@ from python_api.primitive.component.module import encoder, regressor
 
 
 class HashGrid(nn.Module):
-    def __init__(self, bound) -> None:
+    def __init__(self, bound, aabb) -> None:
         super(HashGrid, self).__init__()
         self.bound = bound
         self.encoder = encoder.HashEncoder(desired_resolution=2048)
@@ -14,7 +14,7 @@ class HashGrid(nn.Module):
                                        output_ch=1+15,
                                        skip_connections=[],
                                        bias=False)
-        self.aabb = torch.Tensor([-bound,-bound,-bound,bound,bound,bound])
+        self.aabb = torch.Tensor(aabb)
 
     def forward(self, xyzs):
         inputs = self.encoder(xyzs, self.bound)
