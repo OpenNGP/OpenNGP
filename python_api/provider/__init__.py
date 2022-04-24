@@ -1,5 +1,5 @@
 from .dataset import Blender, LLFF, Multicam, Muyu
-from .dataset_ngp import NeRFRayDataset
+from .dataset_ngp import NeRFRayDataset, NeRFDatasetTestIter
 from .data_transformer import DataTransformer
 from .data_utils import prepare_data
 
@@ -10,7 +10,8 @@ dataset_dict = {
     'llff': LLFF,
     'multicam': Multicam,
     'muyu': Muyu,
-    'NeRFRay': NeRFRayDataset
+    'NeRFRay': NeRFRayDataset,
+    'NeRFTestIter': NeRFDatasetTestIter,
 }
 
 

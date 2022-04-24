@@ -17,8 +17,10 @@ from scipy.spatial.transform import Slerp, Rotation
 import json
 
 from tqdm import tqdm
+from python_api.provider.data_utils import get_rays
+from python_api.provider.scannet_utils import read_files
 
-from python_api.renderer.rays import RaysWithDepth
+from python_api.renderer.rays import RaysWithDepth, RaysWithDepthCos
 
 
 # ref: https://github.com/NVlabs/instant-ngp/blob/b76004c8cf478880227401ae763be4c02f80b62f/include/neural-graphics-primitives/nerf_loader.h#L50
@@ -93,6 +95,8 @@ class NeRFDataset(Dataset):
 
         if 'nerf_synthetic' == coordinate:
             self.init_from_synthetic(transform, downscale, 'nerf', n_test)
+        elif 'scannet' == coordinate:
+            self.init_from_scannet(transform, downscale, 'nerf', n_test)
         else:
             self.init_from_arkit(transform, downscale, coordinate, n_test)
 
@@ -254,9 +258,9 @@ class NeRFDataset(Dataset):
                     depth = load_depth(self.root_path, img_id)
                     mask = load_depth_confidence(self.root_path, img_id)
                     self.ori_depths.append((depth*depth_scale, mask))
-                    depth = cv2.resize(depth, (self.W, self.H), interpolation=cv2.INTER_AREA)
+                    depth = cv2.resize(depth, (self.W, self.H), interpolation=cv2.INTER_LINEAR)
                     depth *= depth_scale
-                    mask = cv2.resize(mask, (self.W, self.H), interpolation=cv2.INTER_AREA)
+                    mask = cv2.resize(mask, (self.W, self.H), interpolation=cv2.INTER_LINEAR)
                     mask = mask >= 2
                     self.depths.append(depth)
                     self.masks.append(mask)
@@ -345,6 +349,74 @@ class NeRFDataset(Dataset):
         self.poses = np.stack(self.poses, axis=0).astype(np.float32)
         # self.rand_offsets = np.stack(self.rand_offsets, axis=0).astype(np.float32)
 
+    def init_from_scannet(self, transform, downscale, coordinate, n_test):
+        self.scale = transform.get('scale', 1.0)
+        self.offset = transform.get('offset', [0, 0, 0])
+        self.depth_scale = transform.get('depth_scale', 1.0)
+        if 'h' in transform and 'w' in transform:
+            self.H = int(transform['h'] // downscale)
+            self.W = int(transform['w'] // downscale)
+
+        poses = []
+        intrinsics = []
+        self.images = []
+        self.depths = []
+        self.masks = []
+        self.names = []
+        self.ori_depths = []
+        depth_scaling_factor = float(transform['depth_scaling_factor'])
+        for frame in tqdm(transform['frames']):
+            name = os.path.basename(frame['file_path'])
+            self.names.append(os.path.splitext(name)[0])
+            pose = np.array(frame['transform_matrix'], dtype=np.float32)  # [4, 4]
+            pose = nerf_matrix_to_ngp(pose, self.scale, self.offset, coordinate)
+            poses.append(pose)
+
+            fx, fy, cx, cy = frame['fx'], frame['fy'], frame['cx'], frame['cy']
+            intrinsic = np.eye(3, dtype=np.float32)
+            intrinsic[0, 0] = fx / downscale
+            intrinsic[1, 1] = fy / downscale
+            intrinsic[0, 2] = cx / downscale
+            intrinsic[1, 2] = cy / downscale
+            intrinsics.append(intrinsic)
+
+            filename = frame['file_path']
+            filename = filename.replace("rgb", "target_depth")
+            filename = filename.replace(".jpg", ".png")
+
+            if '' == frame['file_path']:
+                continue
+
+            image, depth = read_files(self.root_path,
+                                      frame['file_path'],
+                                      filename)
+            H, W = image.shape[:2]
+            self.H = int(H // downscale)
+            self.W = int(W // downscale)
+
+            image = cv2.resize(image, (self.W, self.H), interpolation=cv2.INTER_AREA)
+            self.images.append(image)
+
+            mask = np.zeros_like(depth)
+            mask[depth > 0.5] = 1 # 0 values are invalid depth
+            depth = (depth / depth_scaling_factor).astype(np.float32)
+            depth = depth*self.depth_scale
+            depth = cv2.resize(depth, (self.W, self.H), interpolation=cv2.INTER_LINEAR)
+            mask = cv2.resize(mask, (self.W, self.H), interpolation=cv2.INTER_LINEAR)
+            self.depths.append(depth)
+            self.masks.append(mask>0.5)
+            ori_mask = np.zeros_like(depth, dtype=np.uint8)
+            ori_mask[mask>0.5] = 3
+            self.ori_depths.append((depth, ori_mask))
+        self.poses = np.stack(poses, axis=0).astype(np.float32)
+        self.intrinsic = np.stack(intrinsics, axis=0).astype(np.float32)
+        pass
+
+    def get_intrinsic(self, idx):
+        if 2 < len(self.intrinsic.shape):
+            return self.intrinsic[idx]
+        return self.intrinsic
+
     def __len__(self):
         return len(self.poses)
 
@@ -352,7 +424,7 @@ class NeRFDataset(Dataset):
 
         results = {
             'pose': self.poses[index],
-            'intrinsic': self.intrinsic,
+            'intrinsic': self.get_intrinsic(index),
             'index': index,
         }
 
@@ -375,14 +447,15 @@ class NeRFDataset(Dataset):
     def export_pointcloud(self, output_dir=None):
         from trimesh import Trimesh
         from trimesh.exchange.ply import export_ply
-        from .debug_utils import depth_to_pts
+        from .data_utils import depth_to_pts
 
         if output_dir is not None and not os.path.exists(output_dir):
             os.makedirs(output_dir)
         frame_pts = []
         for data in tqdm(self):
+            intrinsic = self.get_intrinsic(data['index'])
             name = data['name']
-            pts = depth_to_pts(data['image'], data['depth'], self.H, self.W, self.intrinsic, data['pose'], False)
+            pts = depth_to_pts(data['image'], data['depth'], self.H, self.W, intrinsic, data['pose'], False)
             pts = pts[data['mask']]
             frame_pts.append(pts)
             if output_dir is not None:
@@ -392,14 +465,14 @@ class NeRFDataset(Dataset):
         return frame_pts
 
     def depth_pointcloud(self):
-        from .debug_utils import depth_to_pts_wo_color
+        from .data_utils import depth_to_pts_wo_color
 
-        H, intrinsic = self.H, self.intrinsic
         HH, WW = self.ori_depths[0][0].shape
-        intrinsic = intrinsic / (H // HH)
-        intrinsic[2, 2] = 1
         frame_pts = []
         for data in tqdm(self):
+            intrinsic = self.get_intrinsic(data['index'])
+            intrinsic = intrinsic / (self.H // HH)
+            intrinsic[2, 2] = 1
             depth, mask = self.ori_depths[data['index']]
             pts = depth_to_pts_wo_color(depth, HH, WW, intrinsic, data['pose'], False)
             pts = pts[mask >= 2]
@@ -421,8 +494,12 @@ class NeRFRayDataset(Dataset):
         self.total_rays = len(self.img_dataset) * self.rays_per_img
         # self.generate_ray_bundle()
 
+    @property
+    def size(self):
+        return len(self.img_dataset)
+
     def generate_ray_bundle(self):
-        from .utils import get_rays
+        from .data_utils import get_rays
 
         intersector = self.img_dataset.fusion_intersector
         bundle_rays, bundle_depths, bundle_masks, bundle_inds = [], [], [], []
@@ -495,10 +572,11 @@ class NeRFRayDataset(Dataset):
     def __getitem__(self, index):
         # compute ray when quering
         img_idx = int(index/self.rays_per_img)
+        intrinsic = self.img_dataset.get_intrinsic(img_idx)
         img_ij = index - img_idx*self.rays_per_img
         i = int(img_ij/self.img_dataset.W)  # y
         j = img_ij - i*self.img_dataset.W  # x
-        pt_cam = NeRFRayDataset.lift(j, i, 1, self.img_dataset.intrinsic)
+        pt_cam = NeRFRayDataset.lift(j, i, 1, intrinsic)
         c2w = self.img_dataset.poses[img_idx]
         ray_o = c2w[:3, 3]
         pt_world = np.matmul(c2w, pt_cam)[:3]
@@ -550,3 +628,69 @@ class NeRFRayDataset(Dataset):
 
     def depth_pointcloud(self):
         return self.img_dataset.depth_pointcloud()
+
+
+class NeRFDatasetTestIter:
+    def __init__(self, split, train_dir, config):
+        self.render_path = config.render_path
+        type = split
+        if '.json' in train_dir:
+            path = train_dir
+        elif self.render_path:
+            path = os.path.join(train_dir, 'transforms_video.json')
+        else:
+            path = os.path.join(train_dir, 'transforms_test.json')
+        downscale = 1 if config.factor == 0 else config.factor
+        radius = 1
+        n_test = 10
+        self.img_dataset = NeRFDataset(path, type, downscale, radius, n_test)
+        self.batch_size = config.batch_size
+        self.it = 0
+    
+    @property
+    def size(self):
+        return len(self.img_dataset)
+
+    def __iter__(self): return self
+    def __next__(self):
+        if self.render_path:
+            idx = self.it
+            self.it += 1
+        else:
+            idx = 0
+
+        data = self.img_dataset[idx]
+        
+        H, W = int(data['H']), int(data['W'])
+        intrinsic = torch.tensor(data['intrinsic'][None, ...])
+        pose = torch.tensor(data['pose'][None, ...])
+        origins, directions, _ = get_rays(pose, intrinsic, H, W, -1)
+        origins = origins.reshape(H, W, -1).cpu().numpy().squeeze()
+        directions = directions.reshape(H, W, -1).cpu().numpy().squeeze()
+
+        depth_cos = np.matmul(directions, data['pose'][:3, 2:3])
+
+        ones = np.ones_like(origins[..., :1])
+        rays = RaysWithDepthCos(
+            origins=origins,
+            directions=directions,
+            viewdirs=directions,
+            radii=ones,
+            lossmult=ones,
+            near=ones,
+            far=ones,
+            depth_cos=depth_cos)
+
+        extra_info = {
+            'intrinsic': data['intrinsic'],
+            'pose': data['pose'],
+            'size': np.array([H, W])
+        }
+
+        if self.render_path:
+            return {'rays': rays, **extra_info}
+        else:
+            return {
+                'rays': rays,
+                'pixels': self.img_dataset.images[0]
+            }
