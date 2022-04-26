@@ -1,0 +1,29 @@
+Config.data_dir = '/home/asua/muyu/data/hd0/nerfingmvs_data/lego'
+Config.exp_dir = '/home/asua/muyu/data/hd0/nerfingmvs_data/openNGP_exps/lego/debug_baseline_w_sh'
+Config.dataset_loader = 'blender'
+Config.batching = 'single_image'
+Config.batch_size = 1024
+Config.near = 2
+Config.far = 6
+Config.white_bkgd = False
+Config.max_steps = 200000
+Config.precrop_iters = 500
+Config.render_passes = [
+    (
+        'coarse',
+        ('uniform_sampler', {
+            'N_samples': 64,
+            'lindisp': False,
+            'perturb': True
+        }),
+        ('volume_integrator', {})
+    ),
+    (
+        'fine',
+        ('importance_sampler', {
+            'N_importance': 64, 
+            'perturb': True
+        }),
+        ('volume_integrator', {})
+    )
+]

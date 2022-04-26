@@ -1,6 +1,45 @@
-class Rays:
-    def __init__(self, origins, dirs, nears, fars) -> None:
-        self.origins = origins
-        self.dirs = dirs
-        self.nears = nears
-        self.fars = fars
+from collections import namedtuple
+
+Rays = namedtuple(
+    'Rays',
+    (
+        'origins',
+        'directions',
+        'viewdirs',
+        'radii',
+        'lossmult',
+        'near',
+        'far'
+    )
+)
+
+RaysWithDepthCos = namedtuple(
+    'RaysWithDepthCos',
+    (
+        'origins',
+        'directions',
+        'viewdirs',
+        'radii',
+        'lossmult',
+        'near',
+        'far',
+        'depth_cos'
+    )
+)
+
+RaysWithDepth = namedtuple(
+    'RaysWithDepth',
+    (
+        'idx',
+        'ray_idx',
+        'origins',
+        'directions',
+        'viewdirs',
+        'radii',
+        'lossmult',
+        'near',
+        'far',
+        'depth',
+        'mask'
+    )
+)

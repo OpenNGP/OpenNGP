@@ -24,7 +24,7 @@ class FunctionRegistry(Mapping):
         if not callable(value):
             raise ValueError('Cannot set value which is not callable.')
         self._dict[key] = value
-        self._requires[key] = list(inspect.signature(value).parameters.keys())
+        self._requires[key] = inspect.signature(value).parameters
 
     def __iter__(self):
         return iter(self._dict)
