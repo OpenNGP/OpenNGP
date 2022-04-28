@@ -11,5 +11,11 @@ TODO:
 1. dev in cpp for better integratability to current DCC toolchain?
 2. concept model ([wiki](https://github.com/openNGP/openNGP/wiki))
 
+Class Design
+![OpenNGP_class](https://user-images.githubusercontent.com/7394919/165758355-bfbd8c2e-8a5f-4472-bbec-ad59bb90c513.jpg)
+
+Data Flow
+![OpenNGP_dataflow](https://user-images.githubusercontent.com/7394919/165758547-b5b39fec-7045-44dc-9cb8-2f574dd442d5.jpg)
+
 Acknowledgements:\
 [nerf-pytorch](https://github.com/yenchenlin/nerf-pytorch)|[torch-ngp](https://github.com/ashawkey/torch-ngp)
