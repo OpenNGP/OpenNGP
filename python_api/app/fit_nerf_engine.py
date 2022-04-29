@@ -49,9 +49,14 @@ def main(config_file):
     mse2psnr = lambda x : -10. * torch.log(x) / torch.log(torch.Tensor([10.]).to(x.device))
     to8b = lambda x : (255*np.clip(x,0,1)).astype(np.uint8)
 
-    optimizer = torch.optim.Adam([
-        {'name': 'net', 'params': engine.collect_parameters()},
-    ], lr=config.lr_init, betas=(0.9, 0.99), eps=1e-15)
+    optim_params = []
+    optim_params += engine.collect_parameters()
+    optim_params += data_trans.collect_parameters()
+
+    optimizer = torch.optim.Adam(optim_params,
+                                 lr=config.lr_init,
+                                 betas=(0.9, 0.99),
+                                 eps=1e-15)
 
     summary_dir = pjoin(config.exp_dir, "run")
     if not exists(summary_dir): makedirs(summary_dir)
@@ -68,6 +73,7 @@ def main(config_file):
         config.lrate_decay = state_dict['lrate_decay']
         config.lr_init = state_dict['lr_init']
         engine.load_ngp(state_dict)
+        data_trans.load_state(state_dict)
     else:
         total_loss = 0
         step = 1  # state.optimizer.state.step + 1
@@ -77,74 +83,94 @@ def main(config_file):
 
     print('==> start fitting NGP')
     # for step, batch in zip(range(init_step, config.max_steps + 1), dataset):
-    for batch in dataset:
+    for epoch in range(config.max_epochs):
         if step >= config.max_steps + 1: break
+        for batch in dataset:
+            if step >= config.max_steps + 1: break
 
-        batch = data_trans.prepare_data(batch)
-        rays, pixels_gt = batch['rays'], batch['pixels']
-        optimizer.zero_grad()
-        rets = engine.run(rays)
+            batch = data_trans.preprocess_data(batch)
+            rays, pixels_gt = batch['rays'], batch['pixels']
+            optimizer.zero_grad()
+            rets = engine.run(rays)
+            rets = data_trans.postprocess_data(rets, batch)
 
-        loss_dict = criterion(rets, batch)
-        loss, loss_stat = engine.parse_loss_info(loss_dict)
+            loss_dict = criterion(rets, batch)
+            loss, loss_stat = engine.parse_loss_info(loss_dict)
 
-        psnr = mse2psnr(img2mse(rets[-1].pixels.colors, pixels_gt))
-        psnr = psnr.item()
+            psnr = mse2psnr(img2mse(rets[-1].pixels.colors, pixels_gt))
+            psnr = psnr.item()
 
-        loss.backward()
-        optimizer.step()
+            loss.backward()
+            optimizer.step()
 
-        # NOTE: IMPORTANT!
-        ###   update learning rate   ###
-        decay_rate = 0.1
-        decay_steps = config.lrate_decay * 1000
-        new_lrate = config.lr_init * (decay_rate ** (step / decay_steps))
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = new_lrate
+            # NOTE: IMPORTANT!
+            ###   update learning rate   ###
+            decay_rate = 0.1
+            decay_steps = config.lrate_decay * 1000
+            new_lrate = config.lr_init * (decay_rate ** (step / decay_steps))
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = new_lrate
 
-        loss_val = loss.item()
-        total_loss += loss_val
+            loss_val = loss.item()
+            total_loss += loss_val
 
-        if step % config.print_every == 0:
-            for loss_k, loss_v in loss_stat.items():
-                writer.add_scalar(f"train/{loss_k}", loss_v, step)
-            writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], step)
-            writer.add_scalar("train/psnr", psnr, step)
-            pbar.set_description(f"loss={loss_val:.4f} ({total_loss/step:.4f}), psnr={psnr:.4f}, lr={optimizer.param_groups[0]['lr']:.6f}")
-            pbar.update(config.print_every)
+            if step % config.print_every == 0:
+                for loss_k, loss_v in loss_stat.items():
+                    writer.add_scalar(f"train/{loss_k}", loss_v, step)
+                writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], step)
+                writer.add_scalar("train/psnr", psnr, step)
+                pbar.set_description(f"loss={loss_val:.4f} ({total_loss/step:.4f}), psnr={psnr:.4f}, lr={optimizer.param_groups[0]['lr']:.6f}")
+                pbar.update(config.print_every)
 
-        if step % config.save_every == 0:
-            test_batch = next(val_dataset)
-            test_batch = prepare_data(test_batch, engine.device)
-            test_rays, test_pixels_gt = test_batch['rays'], test_batch['pixels']
+            if step % config.save_every == 0:
+                test_batch = next(val_dataset)
+                test_batch = prepare_data(test_batch, engine.device)
+                test_rays, test_pixels_gt = test_batch['rays'], test_batch['pixels']
 
-            test_pixels, depth = engine.draw(test_rays, val_dataset.batch_size)
-            depth = engine.visualize_depth(depth.cpu().numpy())
+                test_pixels, depth = engine.draw(test_rays, val_dataset.batch_size)
+                test_pixels = data_trans.postprocess_data_eval(test_pixels, test_batch)
+                depth = engine.visualize_depth(depth.cpu().numpy())
 
-            # test_loss = criterion(test_pixels, test_pixels_gt).item()
-            test_psnr = mse2psnr(img2mse(test_pixels, test_pixels_gt))
-            test_psnr = test_psnr.item()
-            img = to8b(test_pixels.cpu().numpy())
-            writer.add_image('test/rgb', img.transpose((2, 0, 1)), step)
-            writer.add_image('test/depth', depth.transpose((2, 0, 1)), step)
-            # writer.add_scalar("test/loss", test_loss, step)
-            writer.add_scalar("test/psnr", test_psnr, step)
+                # test_loss = criterion(test_pixels, test_pixels_gt).item()
+                test_psnr = mse2psnr(img2mse(test_pixels, test_pixels_gt))
+                test_psnr = test_psnr.item()
+                img = to8b(test_pixels.cpu().numpy())
+                writer.add_image('test/rgb', img.transpose((2, 0, 1)), step)
+                writer.add_image('test/depth', depth.transpose((2, 0, 1)), step)
+                # writer.add_scalar("test/loss", test_loss, step)
+                writer.add_scalar("test/psnr", test_psnr, step)
 
-            Image.fromarray(img).save(pjoin(valid_dir, f'{step-1:04d}.png'))
-            Image.fromarray(depth).save(pjoin(valid_dir, f'{step-1:04d}_depth.png'))
+                Image.fromarray(img).save(pjoin(valid_dir, f'{step-1:04d}.png'))
+                Image.fromarray(depth).save(pjoin(valid_dir, f'{step-1:04d}_depth.png'))
 
-            state = {
-                'step': step,
-                'total_loss': total_loss,
-                'best_metric': test_psnr,
-                **engine.export_ngp(),
-                'lrate_decay': config.lrate_decay,
-                'lr_init': config.lr_init,
-                'optimizer': optimizer.state_dict()
-            }
-            save_checkpoint(state, best_ckpt, device)
+                state = {
+                    'step': step,
+                    'total_loss': total_loss,
+                    'best_metric': test_psnr,
+                    **engine.export_ngp(),
+                    **data_trans.export_state(),
+                    'lrate_decay': config.lrate_decay,
+                    'lr_init': config.lr_init,
+                    'optimizer': optimizer.state_dict()
+                }
+                save_checkpoint(state, best_ckpt, device)
 
-        step += 1
+            step += 1
+
+    save_checkpoint(
+        {
+            'step': step,
+            'total_loss': total_loss,
+            'best_metric': test_psnr,
+            **engine.export_ngp(),
+            **data_trans.export_state(),
+            'lrate_decay': config.lrate_decay,
+            'lr_init': config.lr_init,
+            'optimizer': optimizer.state_dict()
+        },
+        pjoin(config.exp_dir, f'ckpt_{step}.pth.tar'),
+        device
+    )
 
     writer.close()
     print('==> end fitting NGP')
