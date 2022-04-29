@@ -2,9 +2,11 @@ import torch
 import numpy as np
 from rich.console import Console
 from collections import namedtuple
+from os.path import join as pjoin
 
 from python_api.primitive import NGP_factory
 from python_api.primitive.primitive import Primitive
+from python_api.provider.data_utils import linear_to_srgb
 from python_api.renderer.renderer import Renderer
 from python_api.utils.data_helper import namedtuple_map
 
@@ -16,7 +18,9 @@ class Engine:
     def __init__(self, config) -> None:
         self.config = config
         self.console = Console()
+        self.console.print(config)
         self.device = torch.device(f'cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.color_mode = config.color_mode
         self.primitives = {p['name']: self.build_primitive(p) for p in config.primitives}
         self.pipelines = [self.build_pipeline(p) for p in config.pipelines]
         self.eval_pipelines = [self.build_pipeline(p) for p in config.eval_pipelines]
@@ -40,7 +44,7 @@ class Engine:
         params = []
         for _, primitive in self.primitives.items():
             params += primitive.parameters()
-        return params
+        return [{'name': 'net', 'params': params}]
 
     def load_ngp(self, state_dict):
         [p.load(state_dict[n]) for n, p in self.primitives.items()]
@@ -88,7 +92,9 @@ class Engine:
             lambda r: r.reshape((num_rays, -1)),
             rays
         )
+        ray_to_img = lambda ray_arr: torch.concat(ray_arr).reshape(height, width, -1)
         rgbs, depths = [], []
+        xyzs, sigmas, weights = [], [], []
         with torch.no_grad():
             for i in range(0, num_rays, chunk_size):
                 # pylint: disable=cell-var-from-loop
@@ -99,10 +105,19 @@ class Engine:
                 rets_test = self.run_eval(chunk_rays, {'perturb': False})
                 rgbs.append(rets_test[-1].pixels.colors)
                 depths.append(rets_test[-1].pixels.depths)
-            img_rgb = torch.concat(rgbs)
-            img_rgb = img_rgb.reshape((height, width, -1))
-            img_depth = torch.concat(depths)
-            img_depth = img_depth.reshape((height, width, -1))
+                # xyzs.append(rets_test[-1].samples.xyzs)
+                # sigmas.append(rets_test[-1].rgbs)
+                # weights.append(rets_test[-1].weights)
+            img_rgb = ray_to_img(rgbs)
+            img_depth = ray_to_img(depths)
+            # img_xyzs = ray_to_img(xyzs)
+            # img_sigmas = ray_to_img(sigmas)
+            # img_weights = ray_to_img(weights)
+        # Engine.visualize_ray(img_xyzs[403:404:1, 722:741:1],
+        #                      None,
+        #                      img_weights[403:404:1, 735:736:1],
+        #                      pjoin(self.config.exp_dir, self.config.eval_dir))
+        img_rgb = linear_to_srgb(img_rgb) if 'linear' == self.color_mode else img_rgb
         return img_rgb, img_depth*rays.depth_cos
 
     @staticmethod
@@ -131,3 +146,24 @@ class Engine:
         depth_color[invalid_mask.squeeze(), :] = 0
 
         return cv2.cvtColor(depth_color, cv2.COLOR_BGR2RGB)
+
+    @staticmethod
+    def visualize_ray(xyzs, sigmas, weights, outdir):
+        from matplotlib import cm
+        from trimesh import Trimesh
+        from trimesh.exchange.ply import export_ply
+
+        xyzs = xyzs.reshape((-1, 3)).cpu().numpy()
+        weights = weights.reshape((-1, weights.shape[-1])).cpu().numpy()
+        w_max_by_ray = weights.max(axis=1,keepdims=True)
+        intensity = cm.get_cmap('jet')(weights/w_max_by_ray)
+        intensity = intensity.reshape((-1, intensity.shape[-1]))
+        
+        mesh = Trimesh(vertices=xyzs, vertex_colors=intensity, process=False)
+        open(pjoin(outdir, f'ray_weight.ply'), 'wb').write(export_ply(mesh))
+
+        pass
+
+    @staticmethod
+    def ray_idx_from_pixel_coord(i, j, H, W):
+        return i*W+j

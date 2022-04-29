@@ -11,6 +11,7 @@ from python_api.app.engine import Engine
 from python_api.app.config import Config
 
 from python_api.provider import get_dataset, prepare_data
+from python_api.provider.data_utils import depth_to_pts, pts_to_mesh
 
 
 def save_checkpoint(state_dict, save_path, device):
@@ -29,8 +30,9 @@ def main(config_file):
     engine = Engine(config)
     device = engine.device
 
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    # torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
+    # config.eval_dir = 'debug_ray_train_0000'
     eval_save_dir = pjoin(config.exp_dir, config.eval_dir)
     if not exists(eval_save_dir): makedirs(eval_save_dir)
 
@@ -44,7 +46,9 @@ def main(config_file):
 
     print('==> build dataset')
     config.render_path = True
-    config.batch_size = 2048
+    # config.data_dir = pjoin(config.data_dir, 'transforms_test.json') 
+    # config.factor = 2
+    config.batch_size = max(2048, config.batch_size) 
     val_dataset = get_dataset('test', config.data_dir, config)
 
     pbar = tqdm.tqdm(total=val_dataset.size, bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
@@ -54,11 +58,22 @@ def main(config_file):
     for step, test_batch in zip(range(init_step, val_dataset.size + 1), val_dataset):
         test_batch = prepare_data(test_batch, engine.device)
         rgb, depth = engine.draw(test_batch['rays'], val_dataset.batch_size)
+        rgb = rgb.detach().cpu().numpy()
+        depth = depth.detach().cpu().numpy()
 
-        rgb = (rgb.detach().cpu().numpy() * 255).astype(np.uint8)
+        # frame_pts = depth_to_pts(rgb,
+        #                          depth.squeeze(),
+        #                          test_batch['size'][0].item(),
+        #                          test_batch['size'][1].item(),
+        #                          test_batch['intrinsic'].detach().cpu().numpy(),
+        #                          test_batch['pose'].detach().cpu().numpy(),
+        #                          False)
+        # pts_to_mesh(frame_pts, pjoin(eval_save_dir, f'{step-1:04d}.ply'))
+
+        rgb = (rgb * 255).astype(np.uint8)
         Image.fromarray(rgb).save(pjoin(eval_save_dir, f'{step-1:04d}.png'))
 
-        depth = engine.visualize_depth(depth.cpu().numpy())
+        depth = engine.visualize_depth(depth)
         Image.fromarray(depth).save(pjoin(eval_save_dir, f'{step-1:04d}_depth.png'))
         pbar.update()
 
