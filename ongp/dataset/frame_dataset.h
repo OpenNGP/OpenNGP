@@ -1,5 +1,4 @@
-#ifndef ONGP_DATASET_DATASET_H_
-#define ONGP_DATASET_DATASET_H_
+#pragma one
 
 #include <torch/torch.h>
 
@@ -23,7 +22,6 @@ namespace ongp
     protected:
         FrameDataList fd_list_;
         std::string root_path_;
+
     };
 }
-
-#endif // ONGP_DATASET_DATASET_H_

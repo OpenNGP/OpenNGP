@@ -36,6 +36,16 @@ namespace ongp
         // torch::from_blob do not copy original data buffer!
         return torch::from_blob(Linearize2d(array_2d).data(), {m,n}).clone();
     }
+
+    template <class T>
+    torch::Tensor Array1dToTensor(const Array1d<T>& array_1d)
+    {
+        int m = array_1d.size();
+
+        // torch::from_blob do not copy original data buffer!
+        return torch::from_blob(array_1d.data(), {m}).clone();
+    }
+
     }
 }
 

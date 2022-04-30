@@ -15,6 +15,9 @@ namespace ongp
         SET_MEMBER_FUNC(torch::Tensor, data)
         GET_MEMBER_FUNC(torch::Tensor, data)
 
+        int Width();
+        int Height();
+
     protected:
         torch::Tensor data_;
     };

@@ -1,4 +1,5 @@
 #include "ongp/base/ray.h"
+#include "ongp/base/tensor.h"
 
 namespace ongp
 {

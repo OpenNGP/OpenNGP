@@ -17,7 +17,7 @@ namespace ongp
         GET_MEMBER_FUNC(torch::Tensor, mat44)
 
     protected:
-        torch::Tensor mat44_;
+        torch::Tensor mat44_ = torch::eye(4);
     };
 }
 

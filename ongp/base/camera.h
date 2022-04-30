@@ -1,7 +1,7 @@
-#ifndef ONGP_BASE_CAMERA_H_
-#define ONGP_BASE_CAMERA_H_
+#pragma one
 
 #include "ongp/base/pose.h"
+#include "ongp/base/ray.h"
 #include "ongp/base/macros.h"
 
 namespace ongp
@@ -10,15 +10,19 @@ namespace ongp
     {
     public:
         Camera() = default;
-        explicit Camera(const Pose &pose);
+        explicit Camera(const torch::Tensor &k_mat);
+        Camera(const torch::Tensor &k_mat, const Pose &pose);
+        Camera(const torch::Tensor &k_mat, const torch::Tensor &mat44);
 
         SET_MEMBER_FUNC(Pose, pose)
         GET_MEMBER_FUNC(Pose, pose)
 
+        Ray GenerateRay(int r, int c);
+        Ray GenerateRay(const torch::Tensor &r, const torch::Tensor &c);
 
     protected:
         Pose pose_;
+        torch::Tensor k_mat_;
     };
 }
 
-#endif // ONGP_BASE_CAMERA_H_

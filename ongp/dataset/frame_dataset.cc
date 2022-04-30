@@ -1,4 +1,4 @@
-#include "ongp/dataset/dataset.h"
+#include "ongp/dataset/frame_dataset.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "ongp/external/stb_image.h"
