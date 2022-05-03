@@ -2,7 +2,7 @@
 
 #include <torch/torch.h>
 
-//#include "ongp/base/ray.h"
+#include "ongp/base/ray.h"
 #include "ongp/base/frame.h"
 #include "ongp/dataset/frame_data.h"
 

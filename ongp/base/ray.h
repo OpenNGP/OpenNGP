@@ -1,4 +1,4 @@
-#pragma one
+#pragma once
 
 #include <torch/torch.h>
 #include "ongp/base/macros.h"

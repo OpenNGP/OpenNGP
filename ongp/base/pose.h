@@ -1,6 +1,5 @@
 
-#ifndef ONGP_BASE_POSE_H_
-#define ONGP_BASE_POSE_H_
+#pragma once
 
 #include <torch/torch.h>
 #include "ongp/base/macros.h"
@@ -21,4 +20,3 @@ namespace ongp
     };
 }
 
-#endif // ONGP_BASE_POSE_H_

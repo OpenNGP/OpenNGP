@@ -1,5 +1,4 @@
-#ifndef ONGP_BASE_JSON_H_
-#define ONGP_BASE_JSON_H_
+#pragma once
 
 #include <torch/torch.h>
 #include "ongp/base/macros.h"
@@ -24,5 +23,3 @@ namespace ongp
         json j_;
     };
 }
-
-#endif // ONGP_BASE_JSON_H_

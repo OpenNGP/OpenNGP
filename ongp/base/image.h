@@ -1,5 +1,4 @@
-#ifndef ONGP_BASE_IMAGE_H_
-#define ONGP_BASE_IMAGE_H_
+#pragma once
 
 #include <torch/torch.h>
 #include "ongp/base/macros.h"
@@ -22,5 +21,3 @@ namespace ongp
         torch::Tensor data_;
     };
 }
-
-#endif // ONGP_BASE_IMAGE_H_

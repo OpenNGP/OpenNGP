@@ -1,5 +1,4 @@
-#ifndef ONGP_DATASET_DATA_LOADER_H_
-#define ONGP_DATASET_DATA_LOADER_H_
+#pragma once
 
 #include "ongp/base/image.h"
 #include "ongp/dataset/frame_data.h"
@@ -18,4 +17,3 @@ namespace ongp
     };
 }
 
-#endif // ONGP_DATASET_DATA_LOADER_H_

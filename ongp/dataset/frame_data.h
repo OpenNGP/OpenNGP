@@ -1,5 +1,4 @@
-#ifndef ONGP_DATASET_FRAME_DATA_H_
-#define ONGP_DATASET_FRAME_DATA_H_
+#pragma once
 
 #include <torch/torch.h>
 
@@ -24,5 +23,3 @@ namespace ongp
         std::vector<FrameData> frames;
     };
 }
-
-#endif // ONGP_DATASET_FRAME_DATA_H_

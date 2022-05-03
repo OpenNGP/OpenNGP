@@ -1,5 +1,4 @@
-#ifndef ONGP_BASE_TENSOR_H_
-#define ONGP_BASE_TENSOR_H_
+#pragma once
 
 #include <torch/torch.h>
 
@@ -48,5 +47,3 @@ namespace ongp
 
     }
 }
-
-#endif // ONGP_BASE_TENSOR_H_
