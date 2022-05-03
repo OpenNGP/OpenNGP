@@ -2,7 +2,7 @@
 
 #include <torch/torch.h>
 #include "ongp/primitive/primitive.h"
-#include "ongp/dataset/dataset.h"
+#include "ongp/dataset/ray_dataset.h"
 
 namespace ongp
 {
@@ -50,7 +50,7 @@ namespace ongp
     public:
         Trainer(Primitive* primitive, torch::optim::Optimizer* optimizer);
 
-        SET_GET_MEMBER_FUNC(FrameDataset*, frame_dataset)
+        SET_GET_MEMBER_FUNC(RayDataset*, ray_dataset)
         SET_GET_MEMBER_FUNC(int, epoch)
 
         virtual void Train() = 0;
@@ -60,8 +60,7 @@ namespace ongp
         torch::optim::Optimizer* opt_;
 
         int epoch_;
-        FrameDataset* frame_dataset_;
-
+        RayDataset* ray_dataset_;
     };
 }
 

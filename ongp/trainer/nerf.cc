@@ -10,8 +10,8 @@ namespace ongp
     {
         // Prepare dataloader
         auto train_data_loader = torch::data::make_data_loader(
-            *frame_dataset_, torch::data::DataLoaderOptions()
-                                 .batch_size(1)
+            *ray_dataset_, torch::data::DataLoaderOptions()
+                                 .batch_size(256)
                                  .workers(8)
                                  .enforce_ordering(true));
 
@@ -23,14 +23,20 @@ namespace ongp
             {
                 // Reset gradients.
                 opt_->zero_grad();
-            // Execute the model on the input data.
-            torch::Tensor prediction = primitive_->forward(batch.data);
-            // Compute a loss value to judge the prediction of our model.
-            torch::Tensor loss = torch::nll_loss(prediction, batch.target);
-            // Compute gradients of the loss w.r.t. the parameters of our model.
-            loss.backward();
-            // Update the parameters based on the calculated gradients.
-            opt_->step();
+
+                // Execute the model on the input data.
+                //torch::Tensor prediction = primitive_->forward(batch);
+                // TODO: Renderer needed
+                torch::Tensor prediction; // from renderer
+                torch::Tensor gt; // from batch data
+                // Compute a loss value to judge the prediction of our model.
+                torch::Tensor loss = torch::huber_loss(prediction, gt);
+
+                // Compute gradients of the loss w.r.t. the parameters of our model.
+                loss.backward();
+
+                // Update the parameters based on the calculated gradients.
+                opt_->step();
             }
         }
     }

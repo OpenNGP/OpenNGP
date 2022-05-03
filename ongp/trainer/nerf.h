@@ -11,6 +11,7 @@ namespace ongp
         NeRFTrainer(Primitive* primitive, torch::optim::Optimizer* optimizer);
 
         void Train() override;
+
     };
 }
 
