@@ -1,5 +1,4 @@
-#ifndef ONGP_BASE_FRAME_H_
-#define ONGP_BASE_FRAME_H_
+#pragma one
 
 #include "ongp/base/camera.h"
 #include "ongp/base/image.h"
@@ -24,5 +23,3 @@ namespace ongp
         Image img_;
     };
 }
-
-#endif // ONGP_BASE_FRAME_H_

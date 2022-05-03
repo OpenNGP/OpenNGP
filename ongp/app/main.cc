@@ -1,7 +1,7 @@
 #include <torch/torch.h>
 #include <iostream>
 
-#include "ongp/dataset/dataset.h"
+#include "ongp/dataset/frame_dataset.h"
 #include "ongp/base/tensor.h"
 
 int main() {

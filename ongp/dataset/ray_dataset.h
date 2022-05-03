@@ -2,7 +2,7 @@
 
 #include <torch/torch.h>
 
-#include "ongp/base/ray.h"
+//#include "ongp/base/ray.h"
 #include "ongp/base/frame.h"
 #include "ongp/dataset/frame_data.h"
 
@@ -22,9 +22,6 @@ namespace ongp
         RayWithPixel get(size_t index) override;
 
         torch::optional<size_t> size() const override; 
-
-    protected:
-        Image LoadImage(const std::string& img_file);
 
     protected:
         FrameDataList fd_list_;

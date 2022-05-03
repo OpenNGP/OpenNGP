@@ -1,7 +1,5 @@
 #include "ongp/dataset/ray_dataset.h"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "ongp/external/stb_image.h"
+#include "ongp/dataset/image_data.h"
 
 namespace ongp
 {
@@ -20,20 +18,6 @@ namespace ongp
             auto img_path = root_path_ + frame_data.img_path + ".png"; // TODO
             frames_.push_back({Camera(frame_data.mat44), LoadImage(img_path)});
         }
-    }
-
-    Image RayDataset::LoadImage(const std::string& img_file)
-    {
-        int x,y,n;
-        unsigned char *img_data = stbi_load(img_file.c_str(), &x, &y, &n, 0);
-
-        torch::Tensor img_tensor = torch::from_blob(img_data, {x, y, n}, torch::kByte).clone();
-        img_tensor = img_tensor.permute({2, 0, 1}); // convert to CxHxW
-
-        stbi_image_free(img_data);
-
-        return Image(img_tensor);
-
     }
 
     RayWithPixel RayDataset::get(size_t index) {

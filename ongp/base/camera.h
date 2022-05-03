@@ -14,8 +14,8 @@ namespace ongp
         Camera(const torch::Tensor &k_mat, const Pose &pose);
         Camera(const torch::Tensor &k_mat, const torch::Tensor &mat44);
 
-        SET_MEMBER_FUNC(Pose, pose)
-        GET_MEMBER_FUNC(Pose, pose)
+        SET_GET_MEMBER_FUNC(Pose, pose)
+        SET_GET_MEMBER_FUNC(torch::Tensor, k_mat)
 
         Ray GenerateRay(int r, int c);
         Ray GenerateRay(const torch::Tensor &r, const torch::Tensor &c);

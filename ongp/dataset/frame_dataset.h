@@ -17,9 +17,6 @@ namespace ongp
         torch::optional<size_t> size() const override; 
 
     protected:
-        Image LoadImage(const std::string& img_file);
-
-    protected:
         FrameDataList fd_list_;
         std::string root_path_;
 

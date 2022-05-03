@@ -43,7 +43,7 @@ namespace ongp
         int m = array_1d.size();
 
         // torch::from_blob do not copy original data buffer!
-        return torch::from_blob(array_1d.data(), {m}).clone();
+        return torch::from_blob(const_cast<T*>(array_1d.data()), {m}).clone();
     }
 
     }
