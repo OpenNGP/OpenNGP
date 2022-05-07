@@ -11,7 +11,7 @@ TODO:
 1. dev in cpp for better integratability to current DCC toolchain?
 
 Class Design
-![OpenNGP_class](https://user-images.githubusercontent.com/7394919/165758355-bfbd8c2e-8a5f-4472-bbec-ad59bb90c513.jpg)
+![OpenNGP_class](https://user-images.githubusercontent.com/7394919/167256775-8b7a004f-7f1b-4239-b611-40b1ce97491b.jpg)
 
 Data Flow
 ![OpenNGP_dataflow](https://user-images.githubusercontent.com/7394919/165758547-b5b39fec-7045-44dc-9cb8-2f574dd442d5.jpg)
