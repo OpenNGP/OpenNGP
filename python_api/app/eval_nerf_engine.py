@@ -57,7 +57,7 @@ def main(config_file):
     print('==> start evaluating NGP')
     for step, test_batch in zip(range(init_step, val_dataset.size + 1), val_dataset):
         test_batch = prepare_data(test_batch, engine.device)
-        rgb, depth = engine.draw(test_batch['rays'], val_dataset.batch_size)
+        rgb, depth, _ = engine.draw(test_batch['rays'], val_dataset.batch_size)
         rgb = rgb.detach().cpu().numpy()
         depth = depth.detach().cpu().numpy()
 

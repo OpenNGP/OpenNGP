@@ -17,7 +17,7 @@ Pipeline = namedtuple('Pipeline', ('name', 'ngp', 'renderer'))
 class Engine:
     def __init__(self, config) -> None:
         self.config = config
-        self.console = Console()
+        self.console = Console(file=open(pjoin(config.exp_dir, 'console.log'), 'w'))
         self.console.print(config)
         self.device = torch.device(f'cuda:0' if torch.cuda.is_available() else 'cpu')
         self.color_mode = config.color_mode
@@ -93,7 +93,7 @@ class Engine:
             rays
         )
         ray_to_img = lambda ray_arr: torch.concat(ray_arr).reshape(height, width, -1)
-        rgbs, depths = [], []
+        rgbs, depths, accs = [], [], []
         xyzs, sigmas, weights = [], [], []
         with torch.no_grad():
             for i in range(0, num_rays, chunk_size):
@@ -105,11 +105,14 @@ class Engine:
                 rets_test = self.run_eval(chunk_rays, {'perturb': False})
                 rgbs.append(rets_test[-1].pixels.colors)
                 depths.append(rets_test[-1].pixels.depths)
+                accs.append(torch.sum(rets_test[-1].weights, -1))
+                # prof.step()
                 # xyzs.append(rets_test[-1].samples.xyzs)
                 # sigmas.append(rets_test[-1].rgbs)
                 # weights.append(rets_test[-1].weights)
             img_rgb = ray_to_img(rgbs)
             img_depth = ray_to_img(depths)
+            img_acc = ray_to_img(accs)
             # img_xyzs = ray_to_img(xyzs)
             # img_sigmas = ray_to_img(sigmas)
             # img_weights = ray_to_img(weights)
@@ -118,7 +121,8 @@ class Engine:
         #                      img_weights[403:404:1, 735:736:1],
         #                      pjoin(self.config.exp_dir, self.config.eval_dir))
         img_rgb = linear_to_srgb(img_rgb) if 'linear' == self.color_mode else img_rgb
-        return img_rgb, img_depth*rays.depth_cos
+        return img_rgb, img_depth*rays.depth_cos, img_acc
+        # return img_rgb, img_depth
 
     @staticmethod
     def visualize_depth(depth, mask=None, depth_min=None, depth_max=None, direct=False):

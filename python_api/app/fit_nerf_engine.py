@@ -6,7 +6,7 @@ import shutil
 
 from tensorboardX import SummaryWriter
 from os import makedirs
-from os.path import exists, join as pjoin
+from os.path import exists, join as pjoin, samefile
 from PIL import Image
 from python_api.app.engine import Engine
 from python_api.app.config import Config
@@ -27,7 +27,8 @@ def main(config_file):
     gin.parse_config_files_and_bindings([config_file], None)
     config = Config()
     if not exists(config.exp_dir): makedirs(config.exp_dir)
-    shutil.copy(config_file, pjoin(config.exp_dir, 'config.gin'))
+    if not samefile(config_file, pjoin(config.exp_dir, 'config.gin')):
+        shutil.copy(config_file, pjoin(config.exp_dir, 'config.gin'))
 
     print('==> build NGP and renderer')
     engine = Engine(config)
@@ -127,9 +128,14 @@ def main(config_file):
                 test_batch = prepare_data(test_batch, engine.device)
                 test_rays, test_pixels_gt = test_batch['rays'], test_batch['pixels']
 
-                test_pixels, depth = engine.draw(test_rays, val_dataset.batch_size)
+                test_pixels, depth, acc = engine.draw(test_rays, val_dataset.batch_size)
                 test_pixels = data_trans.postprocess_data_eval(test_pixels, test_batch)
-                depth = engine.visualize_depth(depth.cpu().numpy())
+                acc = acc.cpu().numpy()
+                depth = depth.cpu().numpy()
+                acc_mask = acc > 0.9
+                depth_w_mask = engine.visualize_depth(depth, acc_mask)
+                depth = engine.visualize_depth(depth)
+                acc = engine.visualize_depth(acc)
 
                 # test_loss = criterion(test_pixels, test_pixels_gt).item()
                 test_psnr = mse2psnr(img2mse(test_pixels, test_pixels_gt))
@@ -142,6 +148,8 @@ def main(config_file):
 
                 Image.fromarray(img).save(pjoin(valid_dir, f'{step-1:04d}.png'))
                 Image.fromarray(depth).save(pjoin(valid_dir, f'{step-1:04d}_depth.png'))
+                Image.fromarray(depth_w_mask).save(pjoin(valid_dir, f'{step-1:04d}_depth_w_mask.png'))
+                Image.fromarray(acc).save(pjoin(valid_dir, f'{step-1:04d}_acc.png'))
 
                 state = {
                     'step': step,
