@@ -11,6 +11,11 @@ SamplerResult = namedtuple(
     ('xyzs', 'views', 'z_vals', 'deltas')
 )
 
+SamplerResultWithBound = namedtuple(
+    'SamplerResultWithBound',
+    ('xyzs', 'views', 'z_vals', 'deltas', 'nears', 'fars')
+)
+
 
 # Hierarchical sampling (section 5.2)
 def sample_pdf(bins, weights, N_samples, det=False, pytest=False):
@@ -73,8 +78,9 @@ def uniform_sampler(rays: Rays, N_samples: int, lindisp: bool, perturb: bool):
     near, far = rays.near, rays.far
     rays_o, rays_d = rays.origins, rays.directions
     N_rays = rays_o.shape[0]
+    device = rays_o.device
 
-    t_vals = torch.linspace(0., 1., steps=N_samples)
+    t_vals = torch.linspace(0., 1., steps=N_samples, device=device)
     if not lindisp:
         z_vals = near * (1.-t_vals) + far * (t_vals)
     else:
@@ -88,7 +94,7 @@ def uniform_sampler(rays: Rays, N_samples: int, lindisp: bool, perturb: bool):
         upper = torch.cat([mids, z_vals[...,-1:]], -1)
         lower = torch.cat([z_vals[...,:1], mids], -1)
         # stratified samples in those intervals
-        t_rand = torch.rand(z_vals.shape)
+        t_rand = torch.rand(z_vals.shape, device=device)
 
         z_vals = lower + (upper - lower) * t_rand
 
@@ -102,12 +108,13 @@ def uniform_sampler(rays: Rays, N_samples: int, lindisp: bool, perturb: bool):
     return SamplerResult(pts, views, z_vals, deltas)
 
 
-def importance_sampler(rays: Rays,
-                       samples: SamplerResult,  # samples from last pass
-                       weights,
-                       N_importance,
-                       use_norm_dir,
-                       perturb):
+def _importance_sampler(rays: Rays,
+                        samples: SamplerResult,  # samples from last pass
+                        weights,
+                        N_importance,
+                        use_norm_dir,
+                        delta_inf,
+                        perturb):
     rays_o = rays.origins
     if use_norm_dir:
         rays_d = rays.viewdirs
@@ -122,14 +129,54 @@ def importance_sampler(rays: Rays,
     pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples + N_importance, 3]
 
     # Convert these values using volume rendering (Section 4)
-    deltas = delta_from_zval(z_vals, rays_d)
+    deltas = delta_from_zval(z_vals, rays_d, delta_inf)
 
     views = rays.viewdirs[...,None,:].expand(pts.shape)
     
     return SamplerResult(pts, views, z_vals, deltas)
+                   
+
+def importance_sampler(rays: Rays,
+                       samples: SamplerResult,  # samples from last pass
+                       weights,
+                       N_importance,
+                       use_norm_dir,
+                       perturb):
+    return _importance_sampler(rays,
+                               samples,
+                               weights,
+                               N_importance,
+                               use_norm_dir,
+                               1e10,
+                               perturb)
 
 
-def instant_ngp_sampler(rays: Rays, primitive, num_steps, min_near, perturb):
+def ngp_importance_sampler(rays: Rays,
+                           samples: SamplerResultWithBound,  # samples from last pass
+                           weights,
+                           primitive,
+                           N_importance,
+                           perturb):
+    if isinstance(samples, SamplerResultWithBound):
+        sample_dist = (samples.fars - samples.nears) / samples.z_vals.shape[-1]
+        use_norm_dir = True
+    else:
+        sample_dist = (rays.far - rays.near) / samples.z_vals.shape[-1]
+        use_norm_dir = False
+
+    sample_ret = _importance_sampler(rays,
+                               samples,
+                               weights,
+                               N_importance,
+                               use_norm_dir,
+                               sample_dist,
+                               perturb)
+    aabb = primitive.geometry.aabb
+    pts = torch.min(torch.max(sample_ret.xyzs, aabb[:3]), aabb[3:]) # a manual clip.
+    return sample_ret._replace(xyzs=pts)
+
+
+def ngp_uniform_sampler(rays: Rays, primitive, num_steps, min_near, perturb):
     rays_o, rays_d = rays.origins, rays.viewdirs  # rays.directions isn't normalized
     device = rays_o.device
     prefix = rays_o.shape[:-1]
@@ -153,8 +200,19 @@ def instant_ngp_sampler(rays: Rays, primitive, num_steps, min_near, perturb):
     z_vals = z_vals.expand((N, num_steps)) # [N, T]
     z_vals = nears + (fars - nears) * z_vals # [N, T], in [nears, fars]
 
+    # same perturb strategy with ori nerf, which guarantees z_vals in [near, far] 
+    # if perturb > 0.:
+    #     # get intervals between samples
+    #     mids = .5 * (z_vals[...,1:] + z_vals[...,:-1])
+    #     upper = torch.cat([mids, z_vals[...,-1:]], -1)
+    #     lower = torch.cat([z_vals[...,:1], mids], -1)
+    #     # stratified samples in those intervals
+    #     t_rand = torch.rand(z_vals.shape, device=device)
+
+    #     z_vals = lower + (upper - lower) * t_rand
+
     # perturb z_vals
-    sample_dist = (fars - nears) / num_steps
+    sample_dist = (fars - nears) / (num_steps - 1)
     if perturb:
         z_vals = z_vals + (torch.rand(z_vals.shape, device=device) - 0.5) * sample_dist
         #z_vals = z_vals.clamp(nears, fars) # avoid out of bounds xyzs.
@@ -168,7 +226,7 @@ def instant_ngp_sampler(rays: Rays, primitive, num_steps, min_near, perturb):
 
     views = rays.viewdirs[...,None,:].expand(pts.shape)
 
-    return SamplerResult(pts, views, z_vals, deltas)
+    return SamplerResultWithBound(pts, views, z_vals, deltas, nears, fars)
 
 
 def ngp_sampler_with_depth(rays: RaysWithDepth, primitive, num_steps, min_near, perturb, epsilon):
@@ -238,7 +296,9 @@ def sparsity_sampler(rays: RaysWithDepth, primitive, n_sp):
 raysampler = FunctionRegistry(
     uniform_sampler=uniform_sampler,
     importance_sampler=importance_sampler,
-    instant_ngp_sampler=instant_ngp_sampler,
+    instant_ngp_sampler=ngp_uniform_sampler,
+    ngp_uniform_sampler=ngp_uniform_sampler,
+    ngp_importance_sampler=ngp_importance_sampler,
     ngp_sampler_with_depth=ngp_sampler_with_depth,
     sparsity_sampler=sparsity_sampler
 )

@@ -25,7 +25,8 @@ Config.pipelines = [
                 ('instant_ngp_sampler', {
                     'num_steps': 128,
                     'perturb': True,
-                    'bound': 1.2
+                    'bound': 1.2,
+                    'min_near': 0.05
                 }),
                 ('volume_integrator', {})
             )

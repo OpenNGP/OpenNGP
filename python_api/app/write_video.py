@@ -1,4 +1,5 @@
 import gin
+import numpy as np
 from os import listdir, makedirs
 from os.path import isfile, exists, join as pjoin
 from PIL import Image
@@ -18,8 +19,8 @@ def main(config_file):
     rgb_files = sorted([f for f in files if '_depth' not in f])
     depth_files = sorted([f for f in files if '_depth' in f])
 
-    rgbs = [Image.open(f) for f in rgb_files]
-    depths = [Image.open(f) for f in depth_files]
+    rgbs = [np.array(Image.open(f)) for f in rgb_files]
+    depths = [np.array(Image.open(f)) for f in depth_files]
 
     import imageio
     imageio.mimwrite(pjoin(vid_dir, 'rgb.mp4'), rgbs, fps=min(30, len(rgbs)), quality=8)

@@ -22,6 +22,7 @@ class Config:
     grad_max_norm: float = 0.  # Gradient clipping magnitude, disabled if == 0.
     grad_max_val: float = 0.  # Gradient clipping value, disabled if == 0.
     max_steps: int = 200000  # The number of optimization steps.
+    max_epochs: int = 200
     save_every: int = 10000  # The number of steps to save a checkpoint.
     print_every: int = 100  # The number of steps between reports to tensorboard.
     gc_every: int = 10000  # The number of steps between garbage collections.
@@ -43,6 +44,9 @@ class Config:
     lazy_ray: bool = False  # lazy generate ray to save memory
     load_depth: bool = False
     bound: float = 1.0
+    color_mode: str = 'srgb'  # optimize model in srgb/linear mode
     refine_exposure: bool = False
     refine_intrinsic: bool = False
     refine_extrinsic: bool = False
+    refine_extrinsic_affine_repr: str = 'lie'
+    refine_depth_scale: bool = False

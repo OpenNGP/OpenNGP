@@ -243,7 +243,7 @@ class Dataset(threading.Thread):
   # TODO(bydeng): Swap this function with a more flexible camera model.
   def _generate_rays(self):
     """Generating rays for all images. coordinate [right|up|backward]"""
-    return self._generate_rays_from_cams(self.camtoworlds)
+    self.rays = self._generate_rays_from_cams(self.camtoworlds)
 
 
 class Multicam(Dataset):
