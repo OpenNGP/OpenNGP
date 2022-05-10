@@ -154,16 +154,26 @@ def importance_sampler(rays: Rays,
 def ngp_importance_sampler(rays: Rays,
                            samples: SamplerResultWithBound,  # samples from last pass
                            weights,
+                           primitive,
                            N_importance,
                            perturb):
-    sample_dist = (samples.fars - samples.nears) / samples.z_vals.shape[-1]
-    return _importance_sampler(rays,
+    if isinstance(samples, SamplerResultWithBound):
+        sample_dist = (samples.fars - samples.nears) / samples.z_vals.shape[-1]
+        use_norm_dir = True
+    else:
+        sample_dist = (rays.far - rays.near) / samples.z_vals.shape[-1]
+        use_norm_dir = False
+
+    sample_ret = _importance_sampler(rays,
                                samples,
                                weights,
                                N_importance,
-                               True,
+                               use_norm_dir,
                                sample_dist,
                                perturb)
+    aabb = primitive.geometry.aabb
+    pts = torch.min(torch.max(sample_ret.xyzs, aabb[:3]), aabb[3:]) # a manual clip.
+    return sample_ret._replace(xyzs=pts)
 
 
 def ngp_uniform_sampler(rays: Rays, primitive, num_steps, min_near, perturb):
@@ -190,8 +200,19 @@ def ngp_uniform_sampler(rays: Rays, primitive, num_steps, min_near, perturb):
     z_vals = z_vals.expand((N, num_steps)) # [N, T]
     z_vals = nears + (fars - nears) * z_vals # [N, T], in [nears, fars]
 
+    # same perturb strategy with ori nerf, which guarantees z_vals in [near, far] 
+    # if perturb > 0.:
+    #     # get intervals between samples
+    #     mids = .5 * (z_vals[...,1:] + z_vals[...,:-1])
+    #     upper = torch.cat([mids, z_vals[...,-1:]], -1)
+    #     lower = torch.cat([z_vals[...,:1], mids], -1)
+    #     # stratified samples in those intervals
+    #     t_rand = torch.rand(z_vals.shape, device=device)
+
+    #     z_vals = lower + (upper - lower) * t_rand
+
     # perturb z_vals
-    sample_dist = (fars - nears) / num_steps
+    sample_dist = (fars - nears) / (num_steps - 1)
     if perturb:
         z_vals = z_vals + (torch.rand(z_vals.shape, device=device) - 0.5) * sample_dist
         #z_vals = z_vals.clamp(nears, fars) # avoid out of bounds xyzs.
