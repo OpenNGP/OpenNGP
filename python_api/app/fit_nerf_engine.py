@@ -27,8 +27,10 @@ def main(config_file):
     gin.parse_config_files_and_bindings([config_file], None)
     config = Config()
     if not exists(config.exp_dir): makedirs(config.exp_dir)
-    if not samefile(config_file, pjoin(config.exp_dir, 'config.gin')):
+    try:
         shutil.copy(config_file, pjoin(config.exp_dir, 'config.gin'))
+    except shutil.SameFileError:
+        pass
 
     print('==> build NGP and renderer')
     engine = Engine(config)
@@ -135,7 +137,7 @@ def main(config_file):
                 acc_mask = acc > 0.9
                 depth_w_mask = engine.visualize_depth(depth, acc_mask)
                 depth = engine.visualize_depth(depth)
-                acc = engine.visualize_depth(acc)
+                acc = engine.visualize_depth(1-acc, depth_min=0, depth_max=1, direct=True)
 
                 # test_loss = criterion(test_pixels, test_pixels_gt).item()
                 test_psnr = mse2psnr(img2mse(test_pixels, test_pixels_gt))
