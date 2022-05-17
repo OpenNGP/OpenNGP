@@ -91,12 +91,16 @@ class NeRFDataset(Dataset):
         with open(path, 'r') as f:
             transform = json.load(f)
 
+        self.near = transform.get('near', 0.0)
+        self.far = transform.get('far', 0.0)
         coordinate = transform.get('coordinate', 'nerf')
 
         if 'nerf_synthetic' == coordinate:
             self.init_from_synthetic(transform, downscale, 'nerf', n_test)
         elif 'scannet' == coordinate:
             self.init_from_scannet(transform, downscale, 'nerf', n_test)
+        elif 'muyu_synthetic' == coordinate:
+            self.init_from_scannet(transform, downscale, 'ngp', n_test)
         else:
             self.init_from_arkit(transform, downscale, coordinate, n_test)
 
@@ -353,6 +357,7 @@ class NeRFDataset(Dataset):
         self.scale = transform.get('scale', 1.0)
         self.offset = transform.get('offset', [0, 0, 0])
         self.depth_scale = transform.get('depth_scale', 1.0)
+        depth_filter = transform.get('depth_filter')
         if 'h' in transform and 'w' in transform:
             self.H = int(transform['h'] // downscale)
             self.W = int(transform['w'] // downscale)
@@ -380,12 +385,15 @@ class NeRFDataset(Dataset):
             intrinsic[1, 2] = cy / downscale
             intrinsics.append(intrinsic)
 
-            filename = frame['file_path']
-            filename = filename.replace("rgb", "target_depth")
-            filename = filename.replace(".jpg", ".png")
-
             if '' == frame['file_path']:
                 continue
+
+            if 'rgb' in frame['file_path']:
+                filename = frame['file_path']
+                filename = filename.replace("rgb", "target_depth")
+                filename = filename.replace(".jpg", ".png")
+            else:
+                filename = frame['depth_file_path']
 
             image, depth = read_files(self.root_path,
                                       frame['file_path'],
@@ -403,6 +411,13 @@ class NeRFDataset(Dataset):
             depth = depth*self.depth_scale
             depth = cv2.resize(depth, (self.W, self.H), interpolation=cv2.INTER_LINEAR)
             mask = cv2.resize(mask, (self.W, self.H), interpolation=cv2.INTER_LINEAR)
+            if depth_filter is not None:
+                ksize = depth_filter['ksize']
+                percentile = depth_filter['grad_cut_percentile']
+                gX = cv2.Sobel(depth, ddepth=cv2.CV_32F, dx=1, dy=0, ksize=ksize)
+                gY = cv2.Sobel(depth, ddepth=cv2.CV_32F, dx=0, dy=1, ksize=ksize)
+                grad = np.sqrt(gX**2+gY**2)
+                mask[grad > np.percentile(grad, percentile)] = 0
             self.depths.append(depth)
             self.masks.append(mask>0.5)
             ori_mask = np.zeros_like(depth, dtype=np.uint8)
@@ -581,10 +596,10 @@ class NeRFRayDataset(Dataset):
         ray_o = c2w[:3, 3]
         pt_world = np.matmul(c2w, pt_cam)[:3]
         ray_d = pt_world - ray_o
-        ray_d = ray_d / np.linalg.norm(ray_d)
+        ray_view = ray_d / np.linalg.norm(ray_d)
         rgb = self.img_dataset.images[img_idx][i, j]
         depth = self.img_dataset.depths[img_idx][[i], [j]]
-        depth_coef = np.dot(ray_d, c2w[:3, 2])
+        depth_coef = np.dot(ray_view, c2w[:3, 2])
         ray_depth = depth / depth_coef
         mask = self.img_dataset.masks[img_idx][[i], [j]]
 
@@ -596,11 +611,11 @@ class NeRFRayDataset(Dataset):
                                   np.array(img_idx),
                                   ray_o,
                                   ray_d,
-                                  ray_d,
+                                  ray_view,
                                   depth_coef,
-                                  0,
-                                  0,
-                                  0,
+                                  np.array(0),
+                                  np.array([self.img_dataset.near], dtype=np.float32),
+                                  np.array([self.img_dataset.far], dtype=np.float32),
                                   ray_depth,
                                   mask)
         }
@@ -673,12 +688,12 @@ class NeRFDatasetTestIter:
         ones = np.ones_like(origins[..., :1])
         rays = RaysWithDepthCos(
             origins=origins,
-            directions=directions,
+            directions=directions/depth_cos,
             viewdirs=directions,
             radii=ones,
             lossmult=ones,
-            near=ones,
-            far=ones,
+            near=ones*self.img_dataset.near,
+            far=ones*self.img_dataset.far,
             depth_cos=depth_cos)
 
         extra_info = {
