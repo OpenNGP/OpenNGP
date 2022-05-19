@@ -1,5 +1,4 @@
-#pragma one
-
+#pragma once
 
 #include "ongp/base/image.h"
 
