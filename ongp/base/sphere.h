@@ -2,10 +2,11 @@
 
 #include <torch/torch.h>
 #include "ongp/base/ray.h"
+#include "ongp/base/object.h"
 
 namespace ongp
 {
-class Sphere:
+class Sphere: public Object
 {
 public:
     Sphere() = default;

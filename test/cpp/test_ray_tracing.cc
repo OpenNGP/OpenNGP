@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 #include <torch/torch.h>
 
-#include "ongp/base/tensor.h"
+#include "ongp/base/sphere.h"
 
 
 TEST(RAYTRACING, RENDER) {
@@ -13,9 +13,9 @@ TEST(RAYTRACING, RENDER) {
     const int image_height = static_cast<int>(image_width / aspect_ratio);
 
     // World
-    hittable_list world;
-    world.add(make_shared<sphere>(point3(0,0,-1), 0.5));
-    world.add(make_shared<sphere>(point3(0,-100.5,-1), 100));
+    std::vector<std::shared_ptr<Sphere>> spheres;
+    spheres.push_back(make_shared<sphere>(torch::Tensor({0,0,-1}), 0.5));
+    spheres.push_back(make_shared<sphere>(torch::Tensor({0,-100.5,-1}), 100));
 
     // Camera
     auto viewport_height = 2.0;
