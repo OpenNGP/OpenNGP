@@ -19,9 +19,9 @@ class IntervalDistLoss(nn.Module):
         render_ret = render_rets[-1]
         samples, weights = render_ret.samples, render_ret.weights
         mids = samples.z_vals + 0.5*samples.deltas
-        coef_0 = weights.unsqueeze(2)*weights.unsqueeze(1)
-        term_0 = (coef_0*torch.abs(mids.unsqueeze(2)-mids.unsqueeze(1))).sum()
-        term_1 = ((weights**2)*samples.deltas).sum()
+        coef = weights.unsqueeze(2)*weights.unsqueeze(1)
+        term_0 = (coef*torch.abs(mids.unsqueeze(2)-mids.unsqueeze(1))).sum()
+        term_1 = (torch.diagonal(coef, dim1=1, dim2=2)*samples.deltas).sum()
 
         loss['loss_interval_dist'] = self.weight*(term_0/2 + term_1/3) / batch['pixels'].shape[0]
         return loss
