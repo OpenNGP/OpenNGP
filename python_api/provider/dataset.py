@@ -20,7 +20,7 @@ import threading
 import cv2
 import numpy as np
 from os import listdir
-from os.path import exists, join as pjoin
+from os.path import exists, join as pjoin, dirname
 from PIL import Image
 from python_api.renderer.rays import Rays, RaysWithDepthCos
 from python_api.utils.data_helper import namedtuple_map
@@ -57,13 +57,15 @@ class Dataset(threading.Thread):
     self.queue = queue.Queue(3)  # Set prefetch buffer to 3 batches.
     self.daemon = True
     self.split = split
-    self.data_dir = data_dir
+    self.data_dir = dirname(data_dir)
     self.near = config.near
     self.far = config.far
     self.lazy_ray = config.lazy_ray
     if split == 'train':
       self._train_init(config)
     elif split == 'test':
+      self._test_init(config)
+    elif 'test' in split:
       self._test_init(config)
     else:
       raise ValueError(
@@ -435,11 +437,14 @@ class Muyu(Dataset):
 
   def _load_renderings(self, config):
     """Load images from disk."""
-    with open(
-        pjoin(self.data_dir, 'transforms_aligned.json'), 'r') as fp:
+    if '.json' in config.data_dir:
+      fpath = config.data_dir
+    else:
+      fpath = pjoin(self.data_dir, 'transforms_aligned.json')
+    with open(fpath, 'r') as fp:
       meta = json.load(fp)
 
-    if 'train' == self.split:
+    if 'train' == self.split or 'test_train' == self.split:
       mid = len(meta['frames']) // 2
       frames = meta['frames'][:mid] + meta['frames'][mid+1:]
       cams, hw = self._load_rendering_data(config, frames)

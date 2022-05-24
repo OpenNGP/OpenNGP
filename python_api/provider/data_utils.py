@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 import numpy as np
+from tqdm import tqdm
 
 from python_api.utils.data_helper import namedtuple_map
 
@@ -134,3 +135,116 @@ def est_global_scale(frame_pts):
     offset = -scale*center
     print(f'scale: {scale}', f'offset: {offset}')
     return scale, offset.tolist()
+
+
+def calculate_coords(W, H, device):
+    meshgrid = np.meshgrid(range(W), range(H), indexing='xy')
+    id_coords = np.stack(meshgrid, axis=0).astype(np.float32)
+    id_coords = torch.from_numpy(id_coords)
+    pix_coords = torch.stack(
+            [id_coords[0].view(-1), id_coords[1].view(-1)], 0)
+    ones = torch.ones(1, H * W, device=device)
+    pix_coords = pix_coords.to(ones.device)
+    pix_coords = torch.cat([pix_coords, ones], 0)
+    return pix_coords
+
+
+def BackprojectDepth(depth, invK, pix_coords):
+    ## use cpu memory
+    # batch_size, H, W = depth.shape
+    # ones = np.ones((batch_size, 1, H * W))
+    # cam_points = np.matmul(invK[:, :3, :3].cpu().numpy(), pix_coords.cpu().numpy())
+    # cam_points = depth.view(batch_size, 1, -1).cpu().numpy() * cam_points
+    # cam_points = np.concatenate([cam_points, ones], axis=1)
+    # return torch.from_numpy(cam_points).to(depth.device)
+
+    batch_size, H, W = depth.shape
+    ones = torch.ones(batch_size, 1, H * W, device=depth.device)
+    pix_coords = torch.matmul(invK[:, :3, :3], pix_coords)
+    pix_coords = depth.view(batch_size, 1, -1) * pix_coords
+    pix_coords = torch.cat([pix_coords, ones], 1)
+    return pix_coords
+
+
+def Project3D(points, K, T, H, W, eps=1e-7):
+    batch_size = points.shape[0]
+    P = torch.matmul(K, T)[:, :3, :]
+
+    cam_points = torch.matmul(P, points)
+
+    pix_coords = cam_points[:, :2, :] / (cam_points[:, 2, :].unsqueeze(1) + eps)
+    pix_coords = pix_coords.view(batch_size, 2, H, W)
+    pix_coords = pix_coords.permute(0, 2, 3, 1)
+    pix_coords[..., 0] /= W - 1
+    pix_coords[..., 1] /= H - 1
+    pix_coords = (pix_coords - 0.5) * 2
+    return pix_coords
+
+
+def Project3D_depth(points, K, T, H, W, eps=1e-7):
+    batch_size = points.shape[0]
+    P = torch.matmul(K, T)[:, :3, :]
+
+    cam_points = torch.matmul(P, points)
+    return cam_points[:, 2, :].view(batch_size, H, W)
+
+
+def cal_depth_confidences(depths, T, K, i_train, topk=4, mask=None):
+    device = depths.device
+    
+    _, H, W = depths.shape
+    view_num = len(i_train)
+    if len(T.shape) > 2:
+        batch_K = K[i_train]
+        batch_invK = torch.inverse(batch_K)
+    else:
+        invK = torch.inverse(K)
+        batch_K = torch.unsqueeze(K, 0).repeat(view_num, 1, 1)
+        batch_invK = torch.unsqueeze(invK, 0).repeat(depths.shape[0], 1, 1)
+    T_train = T[i_train]
+    invT = torch.inverse(T_train)
+    pix_coords = calculate_coords(W, H, device)
+    cam_points = BackprojectDepth(depths, batch_invK, pix_coords)
+    init_invalid_mask = torch.full((view_num, H, W), False, dtype=torch.bool, device=device)
+    if mask is not None:
+        init_invalid_mask = ~mask[i_train]
+
+    depth_confidences = []
+    for i in tqdm(range(depths.shape[0])):
+        # depth_confidence = torch.zeros((H, W), dtype=torch.float32)
+        # depth_confidences.append(depth_confidence)
+        # continue
+
+        cam_points_i = cam_points[i:i+1].repeat(view_num, 1, 1)
+        T_i = torch.matmul(invT, T[i:i+1].repeat(view_num, 1, 1))
+        pix_coords_ref = Project3D(cam_points_i, batch_K, T_i, H, W)
+        depths_ = Project3D_depth(cam_points_i, batch_K, T_i, H, W)
+        # zero padding will affect value of boarder pixel
+        # 可以通过不取当前帧规避zero插值问题以及topk第一个始终为自己
+        depths_proj = F.grid_sample(depths[i_train].unsqueeze(1),
+                                    pix_coords_ref,
+                                    padding_mode="border").squeeze()
+        # make depths_proj out of border NaN
+        invalid_mask = init_invalid_mask
+        invalid_mask |= init_invalid_mask[i:i+1].expand(init_invalid_mask.shape)
+        invalid_mask |= (pix_coords_ref[..., 0] < -1)
+        invalid_mask |= (pix_coords_ref[..., 0] > 1)
+        invalid_mask |= (pix_coords_ref[..., 1] < -1)
+        invalid_mask |= (pix_coords_ref[..., 1] > 1)
+        # depths_ might be negative!!!
+        # error = torch.abs((depths_proj - depths_) / (depths_ + 1e-7))
+        # 误差来源
+        # 1. 本图深度突变采样误差
+        # 2. 多图的不一致误差
+        error = torch.abs(depths_proj - depths_)
+        error[invalid_mask] = 1e10
+        depth_confidence, top_inds = error.topk(k=topk, dim=0, largest=False)
+        top_invalid_mask = torch.gather(invalid_mask, 0, top_inds)
+        depth_confidence[top_invalid_mask] = torch.nan
+        depth_confidence = torch.nanmean(depth_confidence, dim=0)
+        depth_confidence[torch.isnan(depth_confidence)] = 0
+        # depth_confidence = depth_confidence.mean(0).cpu().numpy()
+        # debug, 0 uncertainty should resemble |d_pred-d_target|
+        depth_confidences.append(depth_confidence)
+    return np.stack(depth_confidences, 0)
+    return np.stack(depth_confidences, 0)

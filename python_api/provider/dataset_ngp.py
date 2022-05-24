@@ -17,7 +17,7 @@ from scipy.spatial.transform import Slerp, Rotation
 import json
 
 from tqdm import tqdm
-from python_api.provider.data_utils import get_rays
+from python_api.provider.data_utils import get_rays, cal_depth_confidences
 from python_api.provider.scannet_utils import read_files
 
 from python_api.renderer.rays import RaysWithDepth, RaysWithDepthCos
@@ -432,6 +432,9 @@ class NeRFDataset(Dataset):
             return self.intrinsic[idx]
         return self.intrinsic
 
+    def get_intrinsics(self, inds):
+        return np.stack([self.get_intrinsic(idx) for idx in inds])
+
     def __len__(self):
         return len(self.poses)
 
@@ -499,11 +502,19 @@ class NeRFRayDataset(Dataset):
     def __init__(self, split, train_dir, config):
         super().__init__()
         type = split
-        path = os.path.join(train_dir, 'transforms_aligned.json')
+        if '.json' in train_dir:
+            path = train_dir
+        else:
+            path = os.path.join(train_dir, 'transforms_aligned.json')
         downscale = 1 if config.factor == 0 else config.factor
         radius = 1
         n_test = 10
         self.img_dataset = NeRFDataset(path, type, downscale, radius, n_test)
+        if config.topk_depth_consistency > 0:
+            topk = config.topk_depth_consistency
+            self.depth_std = self.calc_depth_consistency(topk)
+        else:
+            self.depth_std = None
         # generate all rays
         self.rays_per_img = self.img_dataset.H * self.img_dataset.W
         self.total_rays = len(self.img_dataset) * self.rays_per_img
@@ -603,7 +614,7 @@ class NeRFRayDataset(Dataset):
         ray_depth = depth / depth_coef
         mask = self.img_dataset.masks[img_idx][[i], [j]]
 
-        return {
+        item = {
             'pixels': rgb,
             'ray_depth': ray_depth,
             'ray_mask': mask,
@@ -616,9 +627,17 @@ class NeRFRayDataset(Dataset):
                                   np.array(0),
                                   np.array([self.img_dataset.near], dtype=np.float32),
                                   np.array([self.img_dataset.far], dtype=np.float32),
+                                  depth_coef,
                                   ray_depth,
                                   mask)
         }
+
+        if self.depth_std is not None:
+            depth_error_std = self.depth_std[img_idx][[i], [j]]
+            item['depth_var'] = depth_error_std**2
+            item['ray_depth_var'] = (depth_error_std / depth_coef)**2
+
+        return item
 
         item = {
             'index': index,
@@ -644,6 +663,29 @@ class NeRFRayDataset(Dataset):
     def depth_pointcloud(self):
         return self.img_dataset.depth_pointcloud()
 
+    def calc_depth_consistency(self, topk):
+        depths, masks = list(zip(*self.img_dataset.ori_depths))
+        depths = np.stack(depths)
+        masks = np.stack(masks) >= 2
+        T = self.img_dataset.poses
+
+        img_H, img_W = self.img_dataset.depths[0].shape
+        factor = img_H / depths.shape[1]
+
+        i_train = np.arange(len(T))
+        K = np.identity(4, dtype=depths.dtype)
+        K = K[None, ...].repeat(len(T), axis=0)
+        K[:, :3, :3] = self.img_dataset.get_intrinsics(i_train)
+        K[:, [0, 1, 0, 1], [0, 1, 2, 2]] /= factor
+
+        stds = cal_depth_confidences(torch.from_numpy(depths),
+                                     torch.from_numpy(T),
+                                     torch.from_numpy(K),
+                                     i_train,
+                                     topk=topk,
+                                     mask=torch.from_numpy(masks))
+        stds = [cv2.resize(std, (img_W, img_H)) for std in stds]
+        return np.stack(stds)
 
 class NeRFDatasetTestIter:
     def __init__(self, split, train_dir, config):
