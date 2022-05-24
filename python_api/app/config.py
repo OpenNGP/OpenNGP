@@ -50,3 +50,4 @@ class Config:
     refine_extrinsic: bool = False
     refine_extrinsic_affine_repr: str = 'lie'
     refine_depth_scale: bool = False
+    topk_depth_consistency: int = 0

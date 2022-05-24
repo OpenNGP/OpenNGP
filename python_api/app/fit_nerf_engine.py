@@ -103,6 +103,8 @@ def main(config_file):
             psnr = mse2psnr(img2mse(rets[-1].pixels.colors, pixels_gt))
             psnr = psnr.item()
 
+            avg_acc = rets[-1].weights.sum(-1).mean().item()
+
             loss.backward()
             optimizer.step()
 
@@ -122,6 +124,7 @@ def main(config_file):
                     writer.add_scalar(f"train/{loss_k}", loss_v, step)
                 writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], step)
                 writer.add_scalar("train/psnr", psnr, step)
+                writer.add_scalar("train/acc", avg_acc, step)
                 pbar.set_description(f"loss={loss_val:.4f} ({total_loss/step:.4f}), psnr={psnr:.4f}, lr={optimizer.param_groups[0]['lr']:.6f}")
                 pbar.update(config.print_every)
 

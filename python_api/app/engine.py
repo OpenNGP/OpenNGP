@@ -134,7 +134,7 @@ class Engine:
         if not direct:
             depth = 1.0 / (depth + 1e-6)
         invalid_mask = np.logical_or(np.isnan(depth), np.logical_not(np.isfinite(depth)))
-        if mask is not None:
+        if mask is not None and mask.sum() > 0:
             invalid_mask += np.logical_not(mask)
         if depth_min is None:
             depth_min = np.percentile(depth[np.logical_not(invalid_mask)], 5)

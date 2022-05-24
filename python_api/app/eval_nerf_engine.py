@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import tqdm
 
-from os.path import exists, join as pjoin
+from os.path import exists, join as pjoin, dirname
 from os import makedirs
 from PIL import Image
 
@@ -32,7 +32,8 @@ def main(config_file):
 
     # torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
-    # config.eval_dir = 'debug_ray_train_0000'
+    # config.data_dir = pjoin(dirname(config.data_dir), 'transforms_aligned.json') 
+    # config.eval_dir = 'eval_train'
     eval_save_dir = pjoin(config.exp_dir, config.eval_dir)
     if not exists(eval_save_dir): makedirs(eval_save_dir)
 
@@ -46,7 +47,6 @@ def main(config_file):
 
     print('==> build dataset')
     config.render_path = True
-    # config.data_dir = pjoin(config.data_dir, 'transforms_test.json') 
     # config.factor = 2
     config.batch_size = max(2048, config.batch_size) 
     val_dataset = get_dataset('test', config.data_dir, config)
