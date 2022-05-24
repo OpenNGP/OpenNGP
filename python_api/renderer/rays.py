@@ -39,6 +39,7 @@ RaysWithDepth = namedtuple(
         'lossmult',
         'near',
         'far',
+        'depth_cos',
         'depth',
         'mask'
     )

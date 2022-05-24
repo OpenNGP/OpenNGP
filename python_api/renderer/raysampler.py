@@ -114,7 +114,9 @@ def _importance_sampler(rays: Rays,
                         N_importance,
                         use_norm_dir,
                         delta_inf,
-                        perturb):
+                        perturb,
+                        concat_input_sample,
+                        stop_grad):
     rays_o = rays.origins
     if use_norm_dir:
         rays_d = rays.viewdirs
@@ -123,9 +125,15 @@ def _importance_sampler(rays: Rays,
     z_vals = samples.z_vals
     z_vals_mid = .5 * (z_vals[...,1:] + z_vals[...,:-1])
     z_samples = sample_pdf(z_vals_mid, weights[...,1:-1], N_importance, det=(perturb==0.))
-    z_samples = z_samples.detach()
 
-    z_vals, _ = torch.sort(torch.cat([z_vals, z_samples], -1), -1)
+    if stop_grad:
+        z_samples = z_samples.detach()
+
+    if concat_input_sample:
+        z_vals, _ = torch.sort(torch.cat([z_vals, z_samples], -1), -1)
+    else:
+        z_vals, _ = torch.sort(z_samples, -1)
+
     pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples + N_importance, 3]
 
     # Convert these values using volume rendering (Section 4)
@@ -148,7 +156,28 @@ def importance_sampler(rays: Rays,
                                N_importance,
                                use_norm_dir,
                                1e10,
-                               perturb)
+                               perturb,
+                               True,
+                               True)
+
+
+def importance_sampler_mipnerf360(rays: Rays,
+                                  samples: SamplerResult,  # samples from last pass
+                                  weights,
+                                  N_importance,
+                                  use_norm_dir,
+                                  perturb,
+                                  concat_input_sample,
+                                  stop_grad):
+    return _importance_sampler(rays,
+                               samples,
+                               weights,
+                               N_importance,
+                               use_norm_dir,
+                               1e10,
+                               perturb,
+                               concat_input_sample,
+                               stop_grad)
 
 
 def ngp_importance_sampler(rays: Rays,
@@ -170,7 +199,9 @@ def ngp_importance_sampler(rays: Rays,
                                N_importance,
                                use_norm_dir,
                                sample_dist,
-                               perturb)
+                               perturb,
+                               True,
+                               True)
     aabb = primitive.geometry.aabb
     pts = torch.min(torch.max(sample_ret.xyzs, aabb[:3]), aabb[3:]) # a manual clip.
     return sample_ret._replace(xyzs=pts)
@@ -285,7 +316,7 @@ def ngp_sampler_with_depth(rays: RaysWithDepth, primitive, num_steps, min_near, 
     return SamplerResult(pts, views, z_vals, deltas)
 
 
-def sparsity_sampler(rays: RaysWithDepth, primitive, n_sp):
+def sparsity_sampler(rays: Rays, primitive, n_sp):
     device = rays.origins.device
     bound = primitive.geometry.bound
     sp_points = torch.empty((n_sp, 3), device=device)
@@ -296,6 +327,7 @@ def sparsity_sampler(rays: RaysWithDepth, primitive, n_sp):
 raysampler = FunctionRegistry(
     uniform_sampler=uniform_sampler,
     importance_sampler=importance_sampler,
+    importance_sampler_mipnerf360=importance_sampler_mipnerf360,
     instant_ngp_sampler=ngp_uniform_sampler,
     ngp_uniform_sampler=ngp_uniform_sampler,
     ngp_importance_sampler=ngp_importance_sampler,
