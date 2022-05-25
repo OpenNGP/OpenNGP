@@ -3,7 +3,7 @@
 
 namespace ongp
 {
-    void Scene::Add(Object* object)
+    void Scene::Add(ObjectSptr object)
     {
         objects_.push_back(object);
     }

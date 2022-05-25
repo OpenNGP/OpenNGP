@@ -6,18 +6,6 @@
 
 namespace ongp
 {
-    struct RayHit
-    {
-        torch::Tensor point;
-        torch::Tensor normal;
-        double t;
-        bool front_face;
-
-        inline void SetFaceNormal(const ray& r, const torch::Tensor& outward_normal) {
-        front_face = torch::dot(r.direction(), outward_normal) < 0;
-        normal = front_face ? outward_normal :-outward_normal;
-        }
-    };
 
     class Ray
     {
@@ -28,7 +16,10 @@ namespace ongp
         SET_GET_MEMBER_FUNC(torch::Tensor, origin)
         SET_GET_MEMBER_FUNC(torch::Tensor, direction)
 
-        torch::Tensor At(double t) const; 
+        SET_GET_MEMBER_FUNC_CONST(torch::Tensor&, origin)
+        SET_GET_MEMBER_FUNC_CONST(torch::Tensor&, direction)
+
+        virtual torch::Tensor At(double t) const; 
 
     protected:
         torch::Tensor origin_ = Array1dToTensor<float>({0,0,0});
@@ -44,8 +35,23 @@ namespace ongp
         SET_GET_MEMBER_FUNC(float, near)
         SET_GET_MEMBER_FUNC(float, far)
 
+        torch::Tensor At(double t) const override;
+
     protected:
         float near_ = 0.1;
         float far_ = 1;
+    };
+
+    struct RayHit
+    {
+        torch::Tensor point;
+        torch::Tensor normal;
+        double t;
+        bool front_face;
+
+        inline void SetFaceNormal(const Ray& r, const torch::Tensor& outward_normal) {
+            front_face = (torch::dot(r.direction(), outward_normal).item<float>() < 0.0);
+            normal = front_face ? outward_normal :-outward_normal;
+        }
     };
 }

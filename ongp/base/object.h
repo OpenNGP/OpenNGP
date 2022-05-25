@@ -10,4 +10,6 @@ namespace ongp
     {
         virtual bool Hit(const Ray& r, double t_min, double t_max, RayHit& hit) const = 0;
     };
+
+    using ObjectSptr = std::shared_ptr<Object>;
 }

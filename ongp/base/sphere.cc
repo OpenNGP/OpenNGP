@@ -10,17 +10,17 @@ namespace ongp
     bool Sphere::Hit(const Ray& r, double t_min, double t_max, RayHit& hit) const {
         auto oc = r.origin() - center_;
         auto a = r.direction().square().sum();
-        auto half_b = dot(oc, r.direction());
+        auto half_b = torch::dot(oc, r.direction());
         auto c = oc.square().sum() - radius_*radius_;
 
         auto discriminant = half_b*half_b - a*c;
-        if (discriminant < 0) return false;
+        if (discriminant.item<float>() < 0.0) return false;
         auto sqrtd = sqrt(discriminant);
 
         // Find the nearest root that lies in the acceptable range.
-        auto root = (-half_b - sqrtd) / a;
+        auto root = ((-half_b - sqrtd) / a).item<float>();
         if (root < t_min || t_max < root) {
-            root = (-half_b + sqrtd) / a;
+            root = ((-half_b + sqrtd) / a).item<float>();
             if (root < t_min || t_max < root)
                 return false;
         }

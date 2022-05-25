@@ -11,9 +11,9 @@ namespace ongp
     public:
         Scene() = default;
 
-        void Add(Object* object);
+        void Add(ObjectSptr object);
     protected:
-        std::shared_ptr<Object> objects_;
+        std::vector<ObjectSptr> objects_;
 
     };
 }

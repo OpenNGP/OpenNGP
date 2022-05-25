@@ -8,7 +8,7 @@ namespace ongp
     {
     }
 
-    torch::Tensor Ray::At(double t) const; {
+    torch::Tensor Ray::At(double t) const {
         return origin_ + t*direction_;
     }
 
@@ -17,7 +17,7 @@ namespace ongp
     {
     }
 
-    torch::Tensor RaySegment::At(double t) const; {
+    torch::Tensor RaySegment::At(double t) const {
         if (t >= near_ && t <= far_)
             return origin_ + t*direction_;
         return torch::zeros({0,0,0});
