@@ -6,11 +6,24 @@
 
 namespace ongp
 {
+    class Intrinsics
+    {
+    public:
+        void SetFromFov(double fov, double aspect_ratio, int height);
+        void SetFromKMat(double fx, double fy, double cx, double cy);
+
+        torch::Tensor Get() const;
+
+    protected:
+        torch::Tensor k_mat_;
+    };
+
     class Camera
     {
     public:
         Camera() = default;
         explicit Camera(const torch::Tensor &k_mat);
+        explicit Camera(const Intrinsics& intrs);
         Camera(const torch::Tensor &k_mat, const Pose &pose);
         Camera(const torch::Tensor &k_mat, const torch::Tensor &mat44);
 
@@ -23,6 +36,7 @@ namespace ongp
     protected:
         Pose pose_;
         torch::Tensor k_mat_;
+        Intrinsics intrs_;
     };
 }
 

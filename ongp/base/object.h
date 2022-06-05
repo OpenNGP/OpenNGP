@@ -8,6 +8,7 @@ namespace ongp
 {
     class Object
     {
+    public:
         virtual bool Hit(const Ray& r, double t_min, double t_max, RayHit& hit) const = 0;
     };
 

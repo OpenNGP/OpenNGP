@@ -3,6 +3,35 @@
 
 namespace ongp
 {
+    void Intrinsics::SetFromFov(double fov, double aspect_ratio, int height)
+    {
+        double f = (height/2)/tan(fov/2); // focus length
+        double fx = f;
+        double fy = f;
+        double cx = aspect_ratio * height / 2;
+        double cy = height / 2;
+        SetFromKMat(fx, fy, cx, cy);
+    }
+
+    void Intrinsics::SetFromKMat(double fx, double fy, double cx, double cy)
+    {
+        k_mat_ = torch::zeros({3,3});
+        k_mat_.index({0,0}) = fx;
+        k_mat_.index({1,1}) = fy;
+        k_mat_.index({0,2}) = cx;
+        k_mat_.index({1,2}) = cy;
+        k_mat_.index({2,2}) = 1;
+    }
+
+
+    torch::Tensor Intrinsics::Get() const
+    {
+        return k_mat_;
+    }
+
+    Camera::Camera(const Intrinsics& intrs): k_mat_(intrs.Get())
+    {}
+
     Camera::Camera(const torch::Tensor &k_mat): k_mat_(k_mat)
     {}
 

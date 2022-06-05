@@ -2,9 +2,11 @@
 #include <gtest/gtest.h>
 #include <torch/torch.h>
 
+#include "ongp/base/camera.h"
 #include "ongp/base/sphere.h"
 #include "ongp/base/scene.h"
 #include "ongp/base/tensor.h"
+#include "ongp/renderer/render_normal.h"
 
 
 TEST(RAYTRACING, RENDER) {
@@ -29,20 +31,30 @@ TEST(RAYTRACING, RENDER) {
 //    auto vertical = vec3(0, viewport_height, 0);
 //    auto lower_left_corner = origin - horizontal/2 - vertical/2 - vec3(0, 0, focal_length);
 //
-//    // Render
-//    std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
-//
-//    for (int j = image_height-1; j >= 0; --j) {
-//        std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
-//        for (int i = 0; i < image_width; ++i) {
-//            auto u = double(i) / (image_width-1);
-//            auto v = double(j) / (image_height-1);
-//            ray r(origin, lower_left_corner + u*horizontal + v*vertical);
-//            color pixel_color = ray_color(r, world);
-//            write_color(std::cout, pixel_color);
-//        }
-//    }
-//
-//    std::cerr << "\nDone.\n";
+
+    ongp::Intrinsics intrs;
+    intrs.SetFromFov(60, aspect_ratio, image_height);
+    ongp::Camera camera(intrs);
+    // I need a camera both for computer vision and graphics
+    // Render
+    std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+
+    for (int j = image_height-1; j >= 0; --j) {
+        std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
+        for (int i = 0; i < image_width; ++i) {
+            auto u = double(i) / (image_width-1);
+            auto v = double(j) / (image_height-1);
+            // extract ray from pixel
+            auto r = camera.GenerateRay(u, v);
+           // torch::Tensor origin;
+           // torch::Tensor direction;
+           // ongp::Ray r(origin, direction);
+            // shading
+            auto pixel_color = ongp::ray_color(r, scene);
+            //write_color(std::cout, pixel_color);
+        }
+    }
+
+    std::cerr << "\nDone.\n";
 
 }
