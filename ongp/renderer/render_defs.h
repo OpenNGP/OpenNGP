@@ -13,7 +13,9 @@ struct RenderPassResult {
   SampleResult samples;
   Pixel pixels;
 };
-class Context {};
+struct Context {
+  
+};
 }  // namespace renderer
 
 }  // namespace ongp
