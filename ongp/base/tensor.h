@@ -45,5 +45,40 @@ namespace ongp
         return torch::from_blob(const_cast<T*>(array_1d.data()), {m}).clone();
     }
 
+    inline double random_double()
+    {
+        return rand() / (RAND_MAX+1);
+    }
+
+    inline double random_double(double min, double max)
+    {
+        return min + (max - min) * random_double();
+    }
+
+    inline torch::Tensor random_vec3()
+    {
+        return Array1dToTensor<double>({random_double(), random_double(), random_double()});
+    }
+
+    inline torch::Tensor random_vec3(double min, double max)
+    {
+        return Array1dToTensor<double>({random_double(min, max), random_double(min, max), random_double(min, max)});
+    }
+
+    inline torch::Tensor random_in_sphere()
+    {
+        while(true)
+        {
+            auto p = random_vec3(-1, 1);
+            if (p.norm().item<float>() >= 1) continue;
+            return p;
+        }
+    }
+
+    inline double clamp(double x, double min, double max) {
+        if (x < min) return min;
+        if (x > max) return max;
+        return x;
+    }
     }
 }

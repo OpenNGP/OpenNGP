@@ -51,7 +51,7 @@ TEST(RAYTRACING, RENDER) {
            // ongp::Ray r(origin, direction);
             // shading
             auto pixel_color = ongp::ray_color(r, scene);
-            //write_color(std::cout, pixel_color);
+            ongp::write_color(std::cout, pixel_color, 100);
         }
     }
 
