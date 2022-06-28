@@ -46,8 +46,8 @@ namespace ongp
         // Camera Coordinate
         float x = static_cast<float>(r) - k_mat_.index({0,2}).item<float>() / k_mat_.index({0,0}).item<float>();
         float y = static_cast<float>(c) - k_mat_.index({1,2}).item<float>() / k_mat_.index({1,1}).item<float>();
-        torch::Tensor Pc = Array1dToTensor<float>({x,y,1});
-        torch::Tensor Oc = Array1dToTensor<float>({0,0,0});
+        torch::Tensor Pc = Array1dToTensor<float>({x,y,1,1});
+        torch::Tensor Oc = Array1dToTensor<float>({0,0,0,1});
 
         // World Coordinate
         torch::Tensor Pw = pose_.mat44().inverse() * Pc;

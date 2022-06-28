@@ -1,5 +1,5 @@
 
-set(MAIN app/main.cc)
+#set(MAIN app/main.cc)
 file(GLOB_RECURSE  ONGP_SRCS CONFIGURE_DEPENDS "*.h" "*.hpp" "*.cc")
 
 #add_executable(ongp ${MAIN} ${ONGP_SRCS})
