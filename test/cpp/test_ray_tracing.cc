@@ -44,18 +44,23 @@ int main() {
     for (int j = image_height-1; j >= 0; --j) {
         std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
         for (int i = 0; i < image_width; ++i) {
-            auto u = double(i) / (image_width-1);
-            auto v = double(j) / (image_height-1);
+           // auto u = double(i) / (image_width-1);
+           // auto v = double(j) / (image_height-1);
+           // DELOG(u);
+           // DELOG(v);
             // extract ray from pixel
-            auto r = camera.GenerateRay(u, v);
-            DELOG(u);
-            DELOG(v);
+            auto r = camera.GenerateRay(i, j);
+            std::cout << r.origin() << std::endl;
+            std::cout << r.direction() << std::endl;
+       //     PAUSE();
+           // DELOG(u);
+           // DELOG(v);
            // torch::Tensor origin;
            // torch::Tensor direction;
            // ongp::Ray r(origin, direction);
             // shading
-      //      auto pixel_color = ongp::ray_color(r, scene);
-      //      ongp::write_color(std::cout, pixel_color, 100);
+            auto pixel_color = ongp::ray_color(r, scene);
+            ongp::write_color(std::cout, pixel_color, 100);
         }
     }
 

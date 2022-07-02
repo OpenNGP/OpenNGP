@@ -80,5 +80,6 @@ namespace ongp
         if (x > max) return max;
         return x;
     }
+
     }
 }

@@ -1,5 +1,6 @@
 #include "ongp/base/camera.h"
 #include "ongp/base/tensor.h"
+#include "delog/delog.h"
 
 namespace ongp
 {
@@ -47,13 +48,20 @@ namespace ongp
         float x = static_cast<float>(r) - k_mat_.index({0,2}).item<float>() / k_mat_.index({0,0}).item<float>();
         float y = static_cast<float>(c) - k_mat_.index({1,2}).item<float>() / k_mat_.index({1,1}).item<float>();
         torch::Tensor Pc = Array1dToTensor<float>({x,y,1,1});
+        DELOG(x);
+        DELOG(y);
+        std::cout << k_mat_ << std::endl;
+        std::cout << Pc << std::endl;
         torch::Tensor Oc = Array1dToTensor<float>({0,0,0,1});
 
         // World Coordinate
-        torch::Tensor Pw = pose_.mat44().inverse() * Pc;
-        torch::Tensor Ow = pose_.mat44().inverse() * Oc;
+        auto Pw = torch::matmul(pose_.mat44().inverse(), Pc);
+        auto Ow = torch::matmul(pose_.mat44().inverse(), Oc);
 
-        return Ray(Ow, Pw);
+//        torch::Tensor Pw = pose_.mat44().inverse() * Pc;
+//        torch::Tensor Ow = pose_.mat44().inverse() * Oc;
+        using namespace torch::indexing;
+        return Ray(Ow.index({Slice(0, 3)}), Pw.index({Slice(0, 3)}));
     }
 
     Ray Camera::GenerateRay(const torch::Tensor &r, const torch::Tensor &c)

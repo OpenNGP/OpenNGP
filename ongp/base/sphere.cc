@@ -1,4 +1,4 @@
-
+#include "delog/delog.h"
 #include "ongp/base/sphere.h"
 
 namespace ongp
@@ -8,6 +8,9 @@ namespace ongp
     {}
 
     bool Sphere::Hit(const Ray& r, double t_min, double t_max, RayHit& hit) const {
+ //       std::cout << r.origin().sizes() << std::endl;
+ //       std::cout << center_.sizes() << std::endl;
+ //       PAUSE();
         auto oc = r.origin() - center_;
         auto a = r.direction().square().sum();
         auto half_b = torch::dot(oc, r.direction());

@@ -1,6 +1,7 @@
 #pragma one
 
 #include <torch/torch.h>
+#include "delog/delog.h"
 
 #include "ongp/base/ray.h"
 #include "ongp/base/scene.h"
@@ -13,7 +14,9 @@ namespace ongp
             return 0.5 * (hit.normal + Array1dToTensor<double>({1,1,1}));
         }
         auto unit_direction = r.direction().norm();
-        auto t = 0.5*(unit_direction[1] + 1.0);
+      //  std::cout << unit_direction.item<double>() << std::endl;
+      //  PAUSE();
+        auto t = 0.5*(unit_direction.item<double>() + 1.0);
         return (1.0-t)*Array1dToTensor<double>({1,1,1}) + t*Array1dToTensor<double>({0.5,0.7,1});
     }
 
