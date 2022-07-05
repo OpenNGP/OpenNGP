@@ -20,7 +20,7 @@ int main() {
 
     // World
     ongp::Scene scene;
-    scene.Add(std::make_shared<ongp::Sphere>(ongp::Array1dToTensor<float>({0,0,-1}), 0.5));
+    scene.Add(std::make_shared<ongp::Sphere>(ongp::Array1dToTensor<float>({0,0,2}), 0.5));
     scene.Add(std::make_shared<ongp::Sphere>(ongp::Array1dToTensor<float>({0,-100.5,-1}), 100));
 
 //    // Camera
@@ -35,7 +35,7 @@ int main() {
 //
 
     ongp::Intrinsics intrs;
-    intrs.SetFromFov(60, aspect_ratio, image_height);
+    intrs.SetFromFov(3.14/3, aspect_ratio, image_height);
     ongp::Camera camera(intrs);
     // I need a camera both for computer vision and graphics
     // Render
@@ -50,9 +50,9 @@ int main() {
            // DELOG(v);
             // extract ray from pixel
             auto r = camera.GenerateRay(i, j);
-            std::cout << r.origin() << std::endl;
-            std::cout << r.direction() << std::endl;
-       //     PAUSE();
+         //   std::cout << r.origin() << std::endl;
+         //   std::cout << r.direction() << std::endl;
+         //   PAUSE();
            // DELOG(u);
            // DELOG(v);
            // torch::Tensor origin;
@@ -60,7 +60,7 @@ int main() {
            // ongp::Ray r(origin, direction);
             // shading
             auto pixel_color = ongp::ray_color(r, scene);
-            ongp::write_color(std::cout, pixel_color, 100);
+            ongp::write_color(std::cout, pixel_color, 1);
         }
     }
 

@@ -11,6 +11,9 @@ namespace ongp
         double fy = f;
         double cx = aspect_ratio * height / 2;
         double cy = height / 2;
+       // DELOG(fx);
+       // DELOG(cx);
+       // PAUSE();
         SetFromKMat(fx, fy, cx, cy);
     }
 
@@ -45,13 +48,15 @@ namespace ongp
     Ray Camera::GenerateRay(int r, int c)
     {
         // Camera Coordinate
-        float x = static_cast<float>(r) - k_mat_.index({0,2}).item<float>() / k_mat_.index({0,0}).item<float>();
-        float y = static_cast<float>(c) - k_mat_.index({1,2}).item<float>() / k_mat_.index({1,1}).item<float>();
-        torch::Tensor Pc = Array1dToTensor<float>({x,y,1,1});
-        DELOG(x);
-        DELOG(y);
-        std::cout << k_mat_ << std::endl;
-        std::cout << Pc << std::endl;
+        float x = (static_cast<float>(r) - k_mat_.index({0,2}).item<float>()) / k_mat_.index({0,0}).item<float>();
+        float y = (static_cast<float>(c) - k_mat_.index({1,2}).item<float>()) / k_mat_.index({1,1}).item<float>();
+        float l = sqrt(x * x + y * y + 1);
+        torch::Tensor Pc = Array1dToTensor<float>({x/l,y/l,1/l,1});
+//        DELOG(x);
+//        DELOG(y);
+   //     std::cout << k_mat_ << std::endl;
+   //     std::cout << Pc << std::endl;
+   //     PAUSE();
         torch::Tensor Oc = Array1dToTensor<float>({0,0,0,1});
 
         // World Coordinate

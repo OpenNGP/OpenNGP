@@ -26,6 +26,8 @@ namespace ongp
         return array;
     }
 
+
+    // Array should use float instead of double. 
     template <class T>
     torch::Tensor Array2dToTensor(const Array2d<T>& array_2d)
     {
@@ -41,7 +43,19 @@ namespace ongp
     {
         int m = array_1d.size();
 
-        // torch::from_blob do not copy original data buffer!
+   //     std::cout << array_1d[0] << array_1d[1] << array_1d[2] << std::endl;
+
+   //     Array2d<T> array;
+   //     Array1d<T> a;
+   //     a.push_back(array_1d[0]);
+   //     a.push_back(array_1d[1]);
+   //     a.push_back(array_1d[2]);
+   //     array.push_back(a);
+
+   //     // torch::from_blob do not copy original data buffer!
+   //     std::cout << torch::from_blob(const_cast<T*>(array_1d.data()), {m,1}).clone() << std::endl;
+   //     std::cout << torch::from_blob(Linearize2d(array).data(), {m,1}).clone() << std::endl;
+   //     // from_blob not working???
         return torch::from_blob(const_cast<T*>(array_1d.data()), {m}).clone();
     }
 
