@@ -69,14 +69,24 @@ namespace ongp
         return min + (max - min) * random_double();
     }
 
-    inline torch::Tensor random_vec3()
+    inline float random_float()
     {
-        return Array1dToTensor<double>({random_double(), random_double(), random_double()});
+        return rand() / float((RAND_MAX+1.0));
     }
 
-    inline torch::Tensor random_vec3(double min, double max)
+    inline float random_float(float min, float max)
     {
-        return Array1dToTensor<double>({random_double(min, max), random_double(min, max), random_double(min, max)});
+        return min + (max - min) * random_float();
+    }
+
+    inline torch::Tensor random_vec3()
+    {
+        return Array1dToTensor<float>({random_float(), random_float(), random_float()});
+    }
+
+    inline torch::Tensor random_vec3(float min, float max)
+    {
+        return Array1dToTensor<float>({random_float(min, max), random_float(min, max), random_float(min, max)});
     }
 
     inline torch::Tensor random_in_sphere()

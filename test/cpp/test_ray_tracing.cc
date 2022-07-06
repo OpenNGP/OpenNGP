@@ -7,6 +7,7 @@
 #include "ongp/base/scene.h"
 #include "ongp/base/tensor.h"
 #include "ongp/renderer/render_normal.h"
+#include "ongp/renderer/render_diffuse.h"
 #include "ongp/external/delog/delog.h"
 
 
@@ -33,6 +34,8 @@ int main() {
 //    auto vertical = vec3(0, viewport_height, 0);
 //    auto lower_left_corner = origin - horizontal/2 - vertical/2 - vec3(0, 0, focal_length);
 //
+    const int samples_per_pixel = 10;
+    const int max_depth = 3;
 
     ongp::Intrinsics intrs;
     intrs.SetFromFov(3.14/3, aspect_ratio, image_height);
@@ -48,19 +51,22 @@ int main() {
            // auto v = double(j) / (image_height-1);
            // DELOG(u);
            // DELOG(v);
-            // extract ray from pixel
-            auto r = camera.GenerateRay(i, j);
-         //   std::cout << r.origin() << std::endl;
-         //   std::cout << r.direction() << std::endl;
-         //   PAUSE();
-           // DELOG(u);
-           // DELOG(v);
-           // torch::Tensor origin;
-           // torch::Tensor direction;
-           // ongp::Ray r(origin, direction);
-            // shading
-            auto pixel_color = ongp::ray_color(r, scene);
-            ongp::write_color(std::cout, pixel_color, 1);
+           auto pixel_color = ongp::Array1dToTensor<float>({0,0,0});
+            for (int s = 0; s < samples_per_pixel; ++s) {
+                // extract ray from pixel
+                auto r = camera.GenerateRay(i+ongp::random_double(), j+ongp::random_double());
+            //   std::cout << r.origin() << std::endl;
+            //   std::cout << r.direction() << std::endl;
+            //   PAUSE();
+            // DELOG(u);
+            // DELOG(v);
+            // torch::Tensor origin;
+            // torch::Tensor direction;
+            // ongp::Ray r(origin, direction);
+                // shading
+                pixel_color += ongp::ray_color(r, scene, max_depth);
+            }
+            ongp::write_color(std::cout, pixel_color, samples_per_pixel);
         }
     }
 
