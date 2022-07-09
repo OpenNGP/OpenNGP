@@ -11,7 +11,7 @@ namespace ongp
 {
     torch::Tensor ray_color(const Ray& r, const Scene& scene, int depth) {
         RayHit hit;
-
+//        DELOG(depth);
         if (depth <= 0)
         {
           return Array1dToTensor<float>({0,0,0});
@@ -21,7 +21,15 @@ namespace ongp
        //     std::cout << -hit.normal << std::endl;
        //     std::cout << 0.5 * (-hit.normal + Array1dToTensor<float>({1,1,1})) << std::endl;
        //     PAUSE();
+
+ //           std::cout << "n:" << hit.normal << std::endl;
+ //           std::cout << "p:" << hit.point << std::endl;
+ //           std::cout << "t:" << hit.t << std::endl;
+ //           std::cout << "f:" << hit.front_face << std::endl;
+ //           PAUSE();
+
             auto p = hit.point + hit.normal + random_in_sphere();
+      //      std::cout << random_in_sphere() << std::endl;
             auto next_ray = Ray(hit.point, (p-hit.point)/(p-hit.point).norm());
             return 0.5 * ray_color(next_ray, scene, depth-1);
         }

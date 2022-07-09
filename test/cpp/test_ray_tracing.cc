@@ -21,7 +21,7 @@ int main() {
 
     // World
     ongp::Scene scene;
-    scene.Add(std::make_shared<ongp::Sphere>(ongp::Array1dToTensor<float>({0,0,2}), 0.5));
+    scene.Add(std::make_shared<ongp::Sphere>(ongp::Array1dToTensor<float>({0,0,1.5}), 0.5));
     scene.Add(std::make_shared<ongp::Sphere>(ongp::Array1dToTensor<float>({0,-100.5,-1}), 100));
 
 //    // Camera
@@ -34,8 +34,8 @@ int main() {
 //    auto vertical = vec3(0, viewport_height, 0);
 //    auto lower_left_corner = origin - horizontal/2 - vertical/2 - vec3(0, 0, focal_length);
 //
-    const int samples_per_pixel = 10;
-    const int max_depth = 3;
+    const int samples_per_pixel = 100;
+    const int max_depth = 50;
 
     ongp::Intrinsics intrs;
     intrs.SetFromFov(3.14/3, aspect_ratio, image_height);
@@ -43,8 +43,10 @@ int main() {
     // I need a camera both for computer vision and graphics
     // Render
     std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+   // std::cout << "P3\n" << image_width << ' ' << 21 << "\n255\n";
 
     for (int j = image_height-1; j >= 0; --j) {
+    //for (int j = 21; j >= 0; --j) {
         std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
         for (int i = 0; i < image_width; ++i) {
            // auto u = double(i) / (image_width-1);
@@ -54,7 +56,7 @@ int main() {
            auto pixel_color = ongp::Array1dToTensor<float>({0,0,0});
             for (int s = 0; s < samples_per_pixel; ++s) {
                 // extract ray from pixel
-                auto r = camera.GenerateRay(i+ongp::random_double(), j+ongp::random_double());
+                auto r = camera.GenerateRay(i+ongp::random_float(), j+ongp::random_float());
             //   std::cout << r.origin() << std::endl;
             //   std::cout << r.direction() << std::endl;
             //   PAUSE();

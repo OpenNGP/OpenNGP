@@ -18,7 +18,8 @@ namespace ongp
 
         auto discriminant = half_b*half_b - a*c;
         if (discriminant.item<float>() < 0.0) return false;
-        auto sqrtd = sqrt(discriminant);
+        //std::cout << "discriminant: " << discriminant << std::endl;
+        auto sqrtd = torch::sqrt(discriminant);
 
         // Find the nearest root that lies in the acceptable range.
         auto root = ((-half_b - sqrtd) / a).item<float>();
@@ -33,6 +34,12 @@ namespace ongp
         auto outward_normal = (hit.point - center_) / radius_;
         hit.SetFaceNormal(r, outward_normal);
         return true;
+    }
+
+    bool Sphere::OnSurface(const torch::Tensor& point) const
+    {
+        double dist = (point - center_).norm().item<float>();
+        return fabs(dist - radius_) < 1e-3;
     }
 
 }

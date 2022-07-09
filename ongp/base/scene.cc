@@ -15,7 +15,7 @@ namespace ongp
         for (auto& object : objects_)
         {
             RayHit rh;
-            if (object->Hit(r, t_min, t_max, rh))
+            if (object->Hit(r, t_min, t_max, rh) && !object->OnSurface(r.origin()))
             {
                 hit_or_not = true;
                 if (rh.t < max_t)
@@ -26,5 +26,15 @@ namespace ongp
             }
         }
         return hit_or_not;
+    }
+
+    bool Scene::OnSurface(const torch::Tensor& point) const
+    {
+        for (auto& object : objects_)
+        {
+            if (object->OnSurface(point))
+                return true;
+        }
+        return false;
     }
 }

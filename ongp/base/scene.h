@@ -14,6 +14,7 @@ namespace ongp
         void Add(ObjectSptr object);
 
         bool Hit(const Ray& r, double t_min, double t_max, RayHit& hit) const;
+        bool OnSurface(const torch::Tensor& point) const;
     protected:
         std::vector<ObjectSptr> objects_;
 
