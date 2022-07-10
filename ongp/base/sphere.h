@@ -6,11 +6,13 @@
 
 namespace ongp
 {
+class Material;
+
 class Sphere: public Object
 {
 public:
     Sphere() = default;
-    Sphere(torch::Tensor center, double r);
+    Sphere(torch::Tensor center, double r, std::shared_ptr<Material> mat_ptr= nullptr);
 
     bool Hit(const Ray& r, double t_min, double t_max, RayHit& hit) const;
     bool OnSurface(const torch::Tensor& point) const;
@@ -18,6 +20,7 @@ public:
 protected:
     torch::Tensor center_;
     double radius_;
+    std::shared_ptr<Material> mat_ptr_;
 };
 
 }

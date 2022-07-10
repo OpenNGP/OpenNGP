@@ -6,6 +6,8 @@
 #include "ongp/base/sphere.h"
 #include "ongp/base/scene.h"
 #include "ongp/base/tensor.h"
+#include "ongp/renderer/lambertian.h"
+#include "ongp/renderer/metal.h"
 #include "ongp/renderer/render_normal.h"
 #include "ongp/renderer/render_diffuse.h"
 #include "ongp/external/delog/delog.h"
@@ -19,10 +21,18 @@ int main() {
     const int image_width = 400;
     const int image_height = static_cast<int>(image_width / aspect_ratio);
 
+    // Material
+    auto material_ground = std::make_shared<ongp::Lambertian>(ongp::Array1dToTensor<float>({0.8, 0.8, 0.0}));
+    auto material_center = std::make_shared<ongp::Lambertian>(ongp::Array1dToTensor<float>({0.7, 0.3, 0.3}));
+    auto material_left   = std::make_shared<ongp::Metal>(ongp::Array1dToTensor<float>({0.8, 0.8, 0.8}), 0.3);
+    auto material_right  = std::make_shared<ongp::Metal>(ongp::Array1dToTensor<float>({0.8, 0.6, 0.2}), 1.0);
+
     // World
     ongp::Scene scene;
-    scene.Add(std::make_shared<ongp::Sphere>(ongp::Array1dToTensor<float>({0,0,1.5}), 0.5));
-    scene.Add(std::make_shared<ongp::Sphere>(ongp::Array1dToTensor<float>({0,-100.5,-1}), 100));
+    scene.Add(std::make_shared<ongp::Sphere>(ongp::Array1dToTensor<float>({0,-100.5,-1}), 100, material_ground));
+    scene.Add(std::make_shared<ongp::Sphere>(ongp::Array1dToTensor<float>({0,0,1.5}), 0.5, material_center));
+    scene.Add(std::make_shared<ongp::Sphere>(ongp::Array1dToTensor<float>({-1.0,0,1.5}), 0.5, material_left));
+    scene.Add(std::make_shared<ongp::Sphere>(ongp::Array1dToTensor<float>({1.0,0,1.5}), 0.5, material_right));
 
 //    // Camera
 //    auto viewport_height = 2.0;
@@ -34,8 +44,8 @@ int main() {
 //    auto vertical = vec3(0, viewport_height, 0);
 //    auto lower_left_corner = origin - horizontal/2 - vertical/2 - vec3(0, 0, focal_length);
 //
-    const int samples_per_pixel = 100;
-    const int max_depth = 50;
+    const int samples_per_pixel = 5;
+    const int max_depth = 30;
 
     ongp::Intrinsics intrs;
     intrs.SetFromFov(3.14/3, aspect_ratio, image_height);

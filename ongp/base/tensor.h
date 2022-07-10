@@ -99,10 +99,38 @@ namespace ongp
         }
     }
 
+    inline torch::Tensor random_unit_vector()
+    {
+        auto vec = random_in_sphere();
+        return vec / vec.norm();
+    }
+
+    inline torch::Tensor random_in_hemisphere(const torch::Tensor& normal) {
+        auto in_unit_sphere = random_unit_vector();
+        if (torch::dot(in_unit_sphere, normal).item<float>() > 0.0) // In the same hemisphere as the normal
+            return in_unit_sphere;
+        else
+            return -in_unit_sphere;
+    }
+
     inline double clamp(double x, double min, double max) {
         if (x < min) return min;
         if (x > max) return max;
         return x;
+    }
+
+    inline bool near_zero(const torch::Tensor& vec3)
+    {
+        const auto s = 1e-6;
+        return (fabs(vec3.index({0}).item<float>()) < s) && (fabs(vec3.index({1}).item<float>()) < s) && (fabs(vec3.index({2}).item<float>()) < s);
+    }
+
+    inline torch::Tensor reflect(const torch::Tensor& v, const torch::Tensor& n) {
+        return v - 2*torch::dot(v,n)*n;
+    }
+
+    inline torch::Tensor unit_vector(const torch::Tensor& v) {
+        return v / v.norm();
     }
 
     }

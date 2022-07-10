@@ -9,7 +9,7 @@
 
 namespace ongp
 {
-    torch::Tensor ray_color(const Ray& r, const Scene& scene, int depth) {
+    inline torch::Tensor ray_color_diffuse(const Ray& r, const Scene& scene, int depth) {
         RayHit hit;
 //        DELOG(depth);
         if (depth <= 0)
@@ -28,7 +28,8 @@ namespace ongp
  //           std::cout << "f:" << hit.front_face << std::endl;
  //           PAUSE();
 
-            auto p = hit.point + hit.normal + random_in_sphere();
+            auto p = hit.point + random_in_hemisphere(hit.normal);
+            //auto p = hit.point + hit.normal + random_unit_vector();
       //      std::cout << random_in_sphere() << std::endl;
             auto next_ray = Ray(hit.point, (p-hit.point)/(p-hit.point).norm());
             return 0.5 * ray_color(next_ray, scene, depth-1);

@@ -6,6 +6,7 @@
 
 namespace ongp
 {
+    class Material;
 
     class Ray
     {
@@ -48,6 +49,7 @@ namespace ongp
         torch::Tensor normal;
         double t;
         bool front_face;
+        std::shared_ptr<Material> mat_ptr;
 
         inline void SetFaceNormal(const Ray& r, const torch::Tensor& outward_normal) {
             front_face = (torch::dot(r.direction(), outward_normal).item<float>() < 0.0);

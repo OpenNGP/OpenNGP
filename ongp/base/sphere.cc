@@ -3,8 +3,8 @@
 
 namespace ongp
 {
-    Sphere::Sphere(torch::Tensor center, double r):
-    center_(center), radius_(r)
+    Sphere::Sphere(torch::Tensor center, double r, std::shared_ptr<Material> mat_ptr)
+    :center_(center), radius_(r), mat_ptr_(mat_ptr)
     {}
 
     bool Sphere::Hit(const Ray& r, double t_min, double t_max, RayHit& hit) const {
@@ -33,6 +33,7 @@ namespace ongp
         hit.point = r.At(hit.t);
         auto outward_normal = (hit.point - center_) / radius_;
         hit.SetFaceNormal(r, outward_normal);
+        hit.mat_ptr = mat_ptr_;
         return true;
     }
 
