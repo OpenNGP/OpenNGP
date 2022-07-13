@@ -133,5 +133,12 @@ namespace ongp
         return v / v.norm();
     }
 
+    torch::Tensor refract(const torch::Tensor& uv, const torch::Tensor& n, double etai_over_etat) {
+        auto cos_theta = std::fmin(torch::dot(-uv, n).item<float>(), 1.0);
+        torch::Tensor r_out_perp =  etai_over_etat * (uv + cos_theta*n);
+        torch::Tensor r_out_parallel = -sqrt(fabs(1.0 - (r_out_perp.norm()*r_out_perp.norm()).item<float>())) * n;
+        return unit_vector(r_out_perp + r_out_parallel);
+    }
+
     }
 }

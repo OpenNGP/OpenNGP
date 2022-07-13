@@ -7,6 +7,7 @@
 #include "ongp/base/scene.h"
 #include "ongp/base/tensor.h"
 #include "ongp/renderer/lambertian.h"
+#include "ongp/renderer/dielectric.h"
 #include "ongp/renderer/metal.h"
 #include "ongp/renderer/render_normal.h"
 #include "ongp/renderer/render_diffuse.h"
@@ -23,8 +24,10 @@ int main() {
 
     // Material
     auto material_ground = std::make_shared<ongp::Lambertian>(ongp::Array1dToTensor<float>({0.8, 0.8, 0.0}));
-    auto material_center = std::make_shared<ongp::Lambertian>(ongp::Array1dToTensor<float>({0.7, 0.3, 0.3}));
-    auto material_left   = std::make_shared<ongp::Metal>(ongp::Array1dToTensor<float>({0.8, 0.8, 0.8}), 0.3);
+    auto material_center = std::make_shared<ongp::Dielectric>(1.5);
+    auto material_left   = std::make_shared<ongp::Dielectric>(1.5);
+ //   auto material_center = std::make_shared<ongp::Lambertian>(ongp::Array1dToTensor<float>({0.7, 0.3, 0.3}));
+ //   auto material_left   = std::make_shared<ongp::Metal>(ongp::Array1dToTensor<float>({0.8, 0.8, 0.8}), 0.3);
     auto material_right  = std::make_shared<ongp::Metal>(ongp::Array1dToTensor<float>({0.8, 0.6, 0.2}), 1.0);
 
     // World
