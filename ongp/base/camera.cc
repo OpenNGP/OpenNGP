@@ -45,6 +45,12 @@ namespace ongp
     Camera::Camera(const torch::Tensor &k_mat, const torch::Tensor& mat44): pose_(mat44), k_mat_(k_mat)
     {}
 
+    Camera::Camera(const Intrinsics& intrs, const Pose &pose): pose_(pose), k_mat_(intrs.Get())
+    {
+      //  std::cout << pose_.mat44() << std::endl;
+      //  PAUSE();
+    }
+
     Ray Camera::GenerateRay(int r, int c)
     {
         // Camera Coordinate
@@ -62,11 +68,18 @@ namespace ongp
         // World Coordinate
         auto Pw = torch::matmul(pose_.mat44().inverse(), Pc);
         auto Ow = torch::matmul(pose_.mat44().inverse(), Oc);
+        auto PO = Pw - Ow;
+
+    //    std::cout << Pw << std::endl;
+    //    std::cout << Ow << std::endl;
+    //    std::cout << PO << std::endl;
+    //    PAUSE();
+
 
 //        torch::Tensor Pw = pose_.mat44().inverse() * Pc;
 //        torch::Tensor Ow = pose_.mat44().inverse() * Oc;
         using namespace torch::indexing;
-        return Ray(Ow.index({Slice(0, 3)}), Pw.index({Slice(0, 3)}));
+        return Ray(Ow.index({Slice(0, 3)}), unit_vector(PO.index({Slice(0, 3)})));
     }
 
     Ray Camera::GenerateRay(const torch::Tensor &r, const torch::Tensor &c)

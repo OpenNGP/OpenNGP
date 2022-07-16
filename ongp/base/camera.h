@@ -26,6 +26,7 @@ namespace ongp
         explicit Camera(const Intrinsics& intrs);
         Camera(const torch::Tensor &k_mat, const Pose &pose);
         Camera(const torch::Tensor &k_mat, const torch::Tensor &mat44);
+        Camera(const Intrinsics& intrs, const Pose &pose);
 
         SET_GET_MEMBER_FUNC(Pose, pose)
         SET_GET_MEMBER_FUNC(torch::Tensor, k_mat)
