@@ -43,4 +43,11 @@ namespace ongp
         return fabs(dist - radius_) < 1e-3;
     }
 
+    bool Sphere::BoundingBox(AABB& output_box) const {
+    output_box = AABB(
+        center_ - Vector3({radius_, radius_, radius_}),
+        center_ + Vector3({radius_, radius_, radius_}));
+    return true;
+}
+
 }

@@ -59,6 +59,17 @@ namespace ongp
         return torch::from_blob(const_cast<T*>(array_1d.data()), {m}).clone();
     }
 
+    template <class T>
+    torch::Tensor Vector3(const std::initializer_list<T>& list)
+    {
+        return Array1dToTensor<T>(list);
+    }
+
+    inline int random_int(int min, int max) {
+        // Returns a random integer in [min,max].
+        return static_cast<int>(random_double(min, max+1));
+    }
+
     inline double random_double()
     {
         return rand() / (RAND_MAX+1);
@@ -138,6 +149,29 @@ namespace ongp
         torch::Tensor r_out_perp =  etai_over_etat * (uv + cos_theta*n);
         torch::Tensor r_out_parallel = -sqrt(fabs(1.0 - (r_out_perp.norm()*r_out_perp.norm()).item<float>())) * n;
         return unit_vector(r_out_perp + r_out_parallel);
+    }
+
+    inline bool box_compare(const ObjectSptr a, const ObjectSptr b, int axis) {
+        AABB box_a;
+        AABB box_b;
+
+        if (!a->BoundingBox(box_a) || !b->BoundingBox(box_b))
+            std::cerr << "No bounding box in bvh_node constructor.\n";
+
+        return box_a.min().e[axis] < box_b.min().e[axis];
+    }
+
+
+    bool box_x_compare (const ObjectSptr a, const ObjectSptr b) {
+        return box_compare(a, b, 0);
+    }
+
+    bool box_y_compare (const ObjectSptr a, const ObjectSptr b) {
+        return box_compare(a, b, 1);
+    }
+
+    bool box_z_compare (const ObjectSptr a, const ObjectSptr b) {
+        return box_compare(a, b, 2);
     }
 
     }

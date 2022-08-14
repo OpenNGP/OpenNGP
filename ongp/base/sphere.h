@@ -16,6 +16,7 @@ public:
 
     bool Hit(const Ray& r, double t_min, double t_max, RayHit& hit) const;
     bool OnSurface(const torch::Tensor& point) const;
+    bool BoundingBox(AABB& output_box) const;
 
 protected:
     torch::Tensor center_;

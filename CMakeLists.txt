@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.14)
 
 project(ongp)
 
-list(APPEND CMAKE_PREFIX_PATH "/nerf/openNGP_3rdparty/libtorch-cpu")
+#list(APPEND CMAKE_PREFIX_PATH "/nerf/openNGP_3rdparty/libtorch-cpu")
+list(APPEND CMAKE_PREFIX_PATH "/nerf/openNGP_3rdparty/libtorch")
 list(APPEND CMAKE_PREFIX_PATH "/nerf/openNGP_3rdparty/gtest")
 message(${CMAKE_PREFIX_PATH})
 

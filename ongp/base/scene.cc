@@ -37,4 +37,20 @@ namespace ongp
         }
         return false;
     }
+
+    bool Scene::BoundingBox(AABB& output_box) const
+    {
+        if (objects_.empty()) return false;
+
+        AABB temp_box;
+        bool first_box = true;
+
+        for (const auto& object : objects_) {
+            if (!object->BoundingBox(temp_box)) return false;
+            output_box = first_box ? temp_box : SurroundingBox(output_box, temp_box);
+            first_box = false;
+        }
+
+        return true;
+    }
 }
