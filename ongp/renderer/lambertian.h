@@ -1,12 +1,15 @@
 #pragma once
 
 #include "ongp/renderer/material.h"
+#include "ongp/renderer/texture.h"
 
 namespace ongp
 {
 class Lambertian : public Material {
 public:
-    Lambertian(const torch::Tensor& a) : albedo(a) {}
+//    Lambertian(const torch::Tensor& a) : albedo(a) {}
+    Lambertian(const torch::Tensor& a) : albedo(std::make_shared<SolidColor>(a)) {}
+    Lambertian(std::shared_ptr<Texture> a) : albedo(a) {}
 
     virtual bool Scatter(
         const Ray& r_in, const RayHit& hit, torch::Tensor& attenuation, Ray& scattered
@@ -15,12 +18,15 @@ public:
         // Catch degenerate scatter direction
         if (near_zero(scatter_direction)) scatter_direction = hit.normal;
         scattered = Ray(hit.point, scatter_direction);
-        attenuation = albedo;
+        //attenuation = albedo;
+        attenuation = albedo->Value(hit.u, hit.v, hit.point);
         return true;
     }
 
 public:
-    torch::Tensor albedo;
+    //torch::Tensor albedo;
+    std::shared_ptr<Texture> albedo;
+
 };
 
 }

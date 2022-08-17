@@ -33,6 +33,7 @@ namespace ongp
         hit.point = r.At(hit.t);
         auto outward_normal = (hit.point - center_) / radius_;
         hit.SetFaceNormal(r, outward_normal);
+        get_sphere_uv(outward_normal, hit.u, hit.v);
         hit.mat_ptr = mat_ptr_;
         return true;
     }

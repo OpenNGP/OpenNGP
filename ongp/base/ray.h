@@ -48,6 +48,8 @@ namespace ongp
         torch::Tensor point;
         torch::Tensor normal;
         double t;
+        double u;
+        double v;
         bool front_face;
         std::shared_ptr<Material> mat_ptr;
 
