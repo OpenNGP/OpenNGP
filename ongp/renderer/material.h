@@ -9,6 +9,9 @@ namespace ongp
         virtual bool Scatter(
         const Ray& r_in, const RayHit& rec, torch::Tensor& attenuation, Ray& scattered
         ) const = 0;
+        virtual torch::Tensor emitted(double u, double v, const torch::Tensor& p) const {
+            return Vector3({0,0,0});
+        }
     };
 
 
