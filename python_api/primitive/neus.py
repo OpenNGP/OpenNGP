@@ -9,7 +9,7 @@ class NeuS(Primitive):
         pass
 
     def query_sigma(self, xyzs):
-        return super().query_sigma(xyzs)
+        return self.geometry.forward(xyzs)
 
     def query_color(self, geo_features, views):
         return super().query_color(geo_features, views)

@@ -432,5 +432,6 @@ raysampler = FunctionRegistry(
     ngp_uniform_sampler=ngp_uniform_sampler,
     ngp_importance_sampler=ngp_importance_sampler,
     ngp_sampler_with_depth=ngp_sampler_with_depth,
-    sparsity_sampler=sparsity_sampler
+    sparsity_sampler=sparsity_sampler,
+    neus_sampler=neus_sampler
 )
