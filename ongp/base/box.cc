@@ -9,14 +9,14 @@ Box::Box(const torch::Tensor& p0, const torch::Tensor& p1, std::shared_ptr<Mater
     box_min = p0;
     box_max = p1;
 
-    sides.Add(std::make_shared<RectXY>(p0.x(), p1.x(), p0.y(), p1.y(), p1.z(), ptr));
-    sides.Add(std::make_shared<RectXY>(p0.x(), p1.x(), p0.y(), p1.y(), p0.z(), ptr));
+    sides.Add(std::make_shared<RectXY>(p0[0].item<float>(), p1[0].item<float>(), p0[1].item<float>(), p1[1].item<float>(), p1[2].item<float>(), ptr));
+    sides.Add(std::make_shared<RectXY>(p0[0].item<float>(), p1[0].item<float>(), p0[1].item<float>(), p1[1].item<float>(), p0[2].item<float>(), ptr));
 
-    sides.Add(std::make_shared<RectXZ>(p0.x(), p1.x(), p0.z(), p1.z(), p1.y(), ptr));
-    sides.Add(std::make_shared<RectXZ>(p0.x(), p1.x(), p0.z(), p1.z(), p0.y(), ptr));
+    sides.Add(std::make_shared<RectXZ>(p0[0].item<float>(), p1[0].item<float>(), p0[2].item<float>(), p1[2].item<float>(), p1[1].item<float>(), ptr));
+    sides.Add(std::make_shared<RectXZ>(p0[0].item<float>(), p1[0].item<float>(), p0[2].item<float>(), p1[2].item<float>(), p0[1].item<float>(), ptr));
 
-    sides.Add(std::make_shared<RectYZ>(p0.y(), p1.y(), p0.z(), p1.z(), p1.x(), ptr));
-    sides.Add(std::make_shared<RectYZ>(p0.y(), p1.y(), p0.z(), p1.z(), p0.x(), ptr));
+    sides.Add(std::make_shared<RectYZ>(p0[1].item<float>(), p1[1].item<float>(), p0[2].item<float>(), p1[2].item<float>(), p1[0].item<float>(), ptr));
+    sides.Add(std::make_shared<RectYZ>(p0[1].item<float>(), p1[1].item<float>(), p0[2].item<float>(), p1[2].item<float>(), p0[0].item<float>(), ptr));
 }
 
 bool Box::Hit(const Ray& r, double t_min, double t_max, RayHit& rec) const {

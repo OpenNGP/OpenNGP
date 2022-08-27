@@ -3,6 +3,7 @@
 
 #include <torch/torch.h>
 #include "ongp/base/object.h"
+#include "ongp/base/ray.h"
 
 namespace ongp
 {

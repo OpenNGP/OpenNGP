@@ -27,7 +27,7 @@ bool ConstantMedium::Hit(const Ray& r, double t_min, double t_max, RayHit& rec) 
     if (rec1.t < 0)
         rec1.t = 0;
 
-    const auto ray_length = r.direction().norm();
+    const auto ray_length = r.direction().norm().item<float>();
     const auto distance_inside_boundary = (rec2.t - rec1.t) * ray_length;
     const auto hit_distance = neg_inv_density * log(random_double());
 
@@ -40,7 +40,7 @@ bool ConstantMedium::Hit(const Ray& r, double t_min, double t_max, RayHit& rec) 
     if (debugging) {
         std::cerr << "hit_distance = " <<  hit_distance << '\n'
                   << "rec.t = " <<  rec.t << '\n'
-                  << "rec.p = " <<  rec.p << '\n';
+                  << "rec.p = " <<  rec.point << '\n';
     }
 
     rec.normal = Vector3({1,0,0});  // arbitrary

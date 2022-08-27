@@ -28,6 +28,11 @@ class RectXY: public Object
             return true;
         }
 
+        virtual bool OnSurface(const torch::Tensor& point) const 
+        {
+            return true;
+        }
+
     public:
         std::shared_ptr<Material> mp;
         double x0, x1, y0, y1, k;
@@ -49,9 +54,13 @@ class RectXZ : public Object{
             output_box = AABB(Vector3({x0,k-0.0001,z0}), Vector3({x1, k+0.0001, z1}));
             return true;
         }
+        virtual bool OnSurface(const torch::Tensor& point) const 
+        {
+            return true;
+        }
 
     public:
-        std::shared_ptr<material> mp;
+        std::shared_ptr<Material> mp;
         double x0, x1, z0, z1, k;
 };
 
@@ -63,7 +72,7 @@ class RectYZ : public Object{
             std::shared_ptr<Material> mat)
             : y0(_y0), y1(_y1), z0(_z0), z1(_z1), k(_k), mp(mat) {};
 
-        virtual bool hit(const Ray& r, double t_min, double t_max, RayHit& rec) const override;
+        virtual bool Hit(const Ray& r, double t_min, double t_max, RayHit& rec) const override;
 
         virtual bool BoundingBox(AABB& output_box) const override {
             // The bounding box must have non-zero width in each dimension, so pad the X
@@ -71,9 +80,13 @@ class RectYZ : public Object{
             output_box = AABB(Vector3({k-0.0001, y0, z0}), Vector3({k+0.0001, y1, z1}));
             return true;
         }
+        virtual bool OnSurface(const torch::Tensor& point) const 
+        {
+            return true;
+        }
 
     public:
-        std::shared_ptr<material> mp;
+        std::shared_ptr<Material> mp;
         double y0, y1, z0, z1, k;
 };
 

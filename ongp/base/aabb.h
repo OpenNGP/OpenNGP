@@ -1,7 +1,8 @@
-#pragma one
+#pragma once
 
 #include <torch/torch.h>
 #include "ongp/base/ray.h"
+#include "ongp/base/object.h"
 
 namespace ongp
 {
@@ -15,31 +16,37 @@ namespace ongp
 
         bool Hit(const Ray& r, double t_min, double t_max) const {
             for (int a = 0; a < 3; a++) {
-                auto t0 = fmin((minimum[a] - r.origin()[a]) / r.direction()[a],
+                auto t0 = torch::fmin((minimum[a] - r.origin()[a]) / r.direction()[a],
                                (maximum[a] - r.origin()[a]) / r.direction()[a]);
-                auto t1 = fmax((minimum[a] - r.origin()[a]) / r.direction()[a],
+                auto t1 = torch::fmax((minimum[a] - r.origin()[a]) / r.direction()[a],
                                (maximum[a] - r.origin()[a]) / r.direction()[a]);
-                t_min = fmax(t0, t_min);
-                t_max = fmin(t1, t_max);
+                t_min = torch::fmax(t0, Vector3({t_min})).item<float>();
+                t_max = torch::fmin(t1, Vector3({t_max})).item<float>();
                 if (t_max <= t_min)
                     return false;
             }
             return true;
         }
 
-        AABB surrounding_box(AABB box0, AABB box1) {
-            torch::Tensor small(fmin(box0.min().x(), box1.min().x()),
-                        fmin(box0.min().y(), box1.min().y()),
-                        fmin(box0.min().z(), box1.min().z()));
+        static AABB surrounding_box(AABB box0, AABB box1) {
+            torch::Tensor small = Vector3({fmin(box0.min()[0].item<float>(), box1.min()[0].item<float>()),
+                        fmin(box0.min()[1].item<float>(), box1.min()[1].item<float>()),
+                        fmin(box0.min()[2].item<float>(), box1.min()[2].item<float>())});
 
-            torch::Tensor big(fmax(box0.max().x(), box1.max().x()),
-                    fmax(box0.max().y(), box1.max().y()),
-                    fmax(box0.max().z(), box1.max().z()));
+            torch::Tensor big = Vector3({fmax(box0.max()[0].item<float>(), box1.max()[0].item<float>()),
+                        fmax(box0.max()[1].item<float>(), box1.max()[1].item<float>()),
+                        fmax(box0.max()[2].item<float>(), box1.max()[2].item<float>())});
 
-            return AABB(small,big);
+            return AABB(small, big);
         }
 
         torch::Tensor minimum;
         torch::Tensor maximum;
 };
+
+bool box_compare(const ObjectSptr a, const ObjectSptr b, int axis);
+
+    bool box_x_compare (const ObjectSptr a, const ObjectSptr b);
+    bool box_y_compare (const ObjectSptr a, const ObjectSptr b);
+    bool box_z_compare (const ObjectSptr a, const ObjectSptr b);
 }

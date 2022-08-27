@@ -1,5 +1,6 @@
 
 #include "ongp/base/scene.h"
+#include "ongp/base/aabb.h"
 
 namespace ongp
 {
@@ -47,7 +48,7 @@ namespace ongp
 
         for (const auto& object : objects_) {
             if (!object->BoundingBox(temp_box)) return false;
-            output_box = first_box ? temp_box : SurroundingBox(output_box, temp_box);
+            output_box = first_box ? temp_box : AABB::surrounding_box(output_box, temp_box);
             first_box = false;
         }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ongp/base/ray.h"
+#include "ongp/base/scene.h"
 
 namespace ongp
 {

@@ -14,7 +14,7 @@ class Isotropic : public Material {
         virtual bool Scatter(
             const Ray& r_in, const RayHit& rec, torch::Tensor& attenuation, Ray& scattered
         ) const override {
-            scattered = Ray(rec.point, random_in_unit_sphere());
+            scattered = Ray(rec.point, random_in_sphere());
             attenuation = albedo->Value(rec.u, rec.v, rec.point);
             return true;
         }

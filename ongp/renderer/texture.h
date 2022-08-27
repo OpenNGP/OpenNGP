@@ -1,5 +1,5 @@
 
-#pragma one
+#pragma once
 
 #include <torch/torch.h>
 #include "ongp/base/tensor.h"
@@ -39,8 +39,8 @@ class CheckerTexture : public Texture {
             : even(std::make_shared<SolidColor>(c1)) , odd(std::make_shared<SolidColor>(c2)) {}
 
         virtual torch::Tensor Value(double u, double v, const torch::Tensor& p) const override {
-            auto sines = sin(10*p.x())*sin(10*p.y())*sin(10*p.z());
-            if (sines < 0)
+            auto sines = sin(10*p[0])*sin(10*p[1])*sin(10*p[2]);
+            if (sines.item<float>() < 0)
                 return odd->Value(u, v, p);
             else
                 return even->Value(u, v, p);

@@ -4,6 +4,7 @@
 #include "ongp/base/object.h"
 #include "ongp/base/ray.h"
 #include "ongp/base/scene.h"
+#include "ongp/base/aabb.h"
 
 namespace ongp
 {

@@ -26,11 +26,11 @@ public:
             //     <0 1 0> yields <0.50 1.00>       < 0 -1  0> yields <0.50 0.00>
             //     <0 0 1> yields <0.25 0.50>       < 0  0 -1> yields <0.75 0.50>
 
-            auto theta = acos(-p.y());
-            auto phi = atan2(-p.z(), p.x()) + pi;
+            auto theta = acos(-p[1]).item<float>();
+            auto phi = atan2(-p[2], p[0]).item<float>() + M_PI;
 
-            u = phi / (2*pi);
-            v = theta / pi;
+            u = phi / (2*M_PI);
+            v = theta / M_PI;
         }
 
 protected:

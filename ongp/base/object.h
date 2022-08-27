@@ -2,11 +2,13 @@
 #pragma once
 
 #include <torch/torch.h>
-#include "ongp/base/ray.h"
-#include "ongp/base/aabb.h"
 
 namespace ongp
 {
+    class Ray;
+    class RayHit;
+    class AABB;
+
     class Object
     {
     public:

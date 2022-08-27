@@ -2,6 +2,7 @@
 
 #include <torch/torch.h>
 
+
 namespace ongp
 {
     namespace 
@@ -65,10 +66,6 @@ namespace ongp
         return Array1dToTensor<T>(list);
     }
 
-    inline int random_int(int min, int max) {
-        // Returns a random integer in [min,max].
-        return static_cast<int>(random_double(min, max+1));
-    }
 
     inline double random_double()
     {
@@ -78,6 +75,11 @@ namespace ongp
     inline double random_double(double min, double max)
     {
         return min + (max - min) * random_double();
+    }
+
+    inline int random_int(int min, int max) {
+        // Returns a random integer in [min,max].
+        return static_cast<int>(random_double(min, max+1));
     }
 
     inline float random_float()
@@ -151,28 +153,7 @@ namespace ongp
         return unit_vector(r_out_perp + r_out_parallel);
     }
 
-    inline bool box_compare(const ObjectSptr a, const ObjectSptr b, int axis) {
-        AABB box_a;
-        AABB box_b;
-
-        if (!a->BoundingBox(box_a) || !b->BoundingBox(box_b))
-            std::cerr << "No bounding box in bvh_node constructor.\n";
-
-        return box_a.min().e[axis] < box_b.min().e[axis];
-    }
-
-
-    bool box_x_compare (const ObjectSptr a, const ObjectSptr b) {
-        return box_compare(a, b, 0);
-    }
-
-    bool box_y_compare (const ObjectSptr a, const ObjectSptr b) {
-        return box_compare(a, b, 1);
-    }
-
-    bool box_z_compare (const ObjectSptr a, const ObjectSptr b) {
-        return box_compare(a, b, 2);
-    }
+    const float infinity = std::numeric_limits<float>::infinity();
 
     }
 }

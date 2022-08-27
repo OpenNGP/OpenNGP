@@ -4,6 +4,7 @@
 #include "ongp/base/ray.h"
 #include "ongp/base/object.h"
 #include "ongp/renderer/texture.h"
+#include "ongp/renderer/isotropic.h"
 
 namespace ongp
 {

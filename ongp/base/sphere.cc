@@ -1,5 +1,6 @@
 #include "delog/delog.h"
 #include "ongp/base/sphere.h"
+#include "ongp/base/aabb.h"
 
 namespace ongp
 {
