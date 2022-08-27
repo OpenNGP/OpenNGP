@@ -1,0 +1,72 @@
+Config.data_dir = '/home/asua/muyu/data/hd0/nerfingmvs_data/lego'
+Config.exp_dir = '/home/asua/muyu/data/hd0/nerfingmvs_data/openNGP_exps/lego/202205062018'
+Config.dataset_loader = 'blender'
+Config.torch_dataset = False
+Config.batching = 'single_image'
+Config.batch_size = 1024
+Config.near = 2
+Config.far = 6
+Config.white_bkgd = False
+Config.max_steps = 120000
+Config.save_every = 10000
+Config.lazy_ray = True
+Config.precrop_iters = 500
+Config.refine_exposure = False
+# Config.color_mode = 'linear'
+Config.criterion = {
+    'name': 'CompositeLoss',
+    'loss_configs': [
+        {
+            'name': 'PixelLoss',
+            'diff_type': 'l2', 
+            'depth_diff_type': 'huber',
+            'bound': 1.5,
+            'epsilon': 0.075,  # 3*std
+            'decay': 500
+        }
+    ]
+    
+}
+Config.primitives = [
+    {
+        'name': 'nerf-coarse',
+        'arch': {'name': 'BaseNeRF'}
+    },
+    {
+        'name': 'nerf-fine',
+        'arch': {'name': 'BaseNeRF'}
+    }
+]
+Config.pipelines = [
+    {
+        'name': 'train-pipeline-0',
+        'primitive': 'nerf-coarse',
+        'renderpasses': [
+            (
+                'coarse',
+                ('uniform_sampler', {
+                    'N_samples': 128,
+                    'lindisp': False,
+                    'perturb': True
+                }),
+                ('volume_integrator', {})
+            )
+        ]
+    },
+    {
+        'name': 'train-pipeline-1',
+        'primitive': 'nerf-fine',
+        'renderpasses': [
+            (
+                'fine',
+                ('importance_sampler', {
+                    'N_importance': 128,
+                    'lindisp': False,
+                    'perturb': True,
+                    'use_norm_dir': False
+                }),
+                ('volume_integrator', {})
+            )
+        ]
+    }
+]
