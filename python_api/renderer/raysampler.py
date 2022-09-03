@@ -108,19 +108,10 @@ def uniform_sampler(rays: Rays, N_samples: int, lindisp: bool, perturb: bool):
     return SamplerResult(pts, views, z_vals, deltas)
 
 
-def neus_sampler(rays: Rays, N_samples: int, N_samples_outside: int, perturb: bool,
-                up_sample_steps:int):
+def neus_outside_sampler(rays: Rays, N_samples_outside: int, N_samples: int, perturb: float):
     near, far = rays.near, rays.far  # [N_rays,], [N_rays,]
     rays_o, rays_d = rays.origins, rays.directions  # [N_rays, 3], [N_rays, 3]
     N_rays = rays_o.shape[0]
-    device = rays_o.device
-    sample_dist = 2.0 / N_samples   # Assuming the region of interest is a unit sphere
-    z_vals = torch.linspace(0.0, 1.0, N_samples)
-    z_vals = near + (far - near) * z_vals[None, :]
-    if perturb > 0:
-        t_rand = (torch.rand([N_rays, 1]) - 0.5)
-        z_vals = z_vals + t_rand * 2.0 / N_samples_outside
-
     ### outside sampling
     z_vals_outside = None
     if N_samples_outside > 0:
@@ -131,20 +122,34 @@ def neus_sampler(rays: Rays, N_samples: int, N_samples_outside: int, perturb: bo
             lower = torch.cat([z_vals_outside[..., :1], mids], -1)
             t_rand = torch.rand([N_rays, z_vals_outside.shape[-1]])
             z_vals_outside = lower[None, :] + (upper - lower)[None, :] * t_rand
-        z_vals_outside = far / torch.flip(z_vals_outside, dims=[-1]) + 1.0 / N_samples  # range from far to infinity
+        z_vals_outside = far / torch.flip(z_vals_outside, dims=[-1]) + 1.0 / N_samples  # range from far to infinity. But why N_samples?
 
-    ### inside sampling
-    if N_samples > 0:
-        pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples, 3]
-        # TODO query sdf
-        sdf = pts.sum(dim=-1)  # [N_rays, N_samples]
-        for idx in range(up_sample_steps):
-            new_z_vals = neus_upsample(rays_o, rays_d, z_vals, sdf, 
-                                        n_importance=N_samples//up_sample_steps, inv_s=64 * 2**idx)
-    pass
+    pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals_outside[...,:,None] # [N_rays, N_samples, 3]
+    
+    # Convert these values using volume rendering (Section 4)
+    deltas = delta_from_zval(z_vals_outside, rays_d)
+
+    views = rays.viewdirs[...,None,:].expand(pts.shape)
+    return SamplerResult(pts, views, z_vals_outside, deltas)
 
 
-def neus_upsample(rays_o, rays_d, z_vals, sdf, n_importance, inv_s):
+def neus_important_sampler(rays: Rays, samples: SamplerResult, weights,
+                           N_importance: int, idx: int):
+    rays_o, rays_d = rays.origins, rays.directions  # [N_rays, 3], [N_rays, 3]
+    z_vals = samples.z_vals
+    sdf = weights
+
+    weights_real = neus_cal_weight(rays_o, rays_d, z_vals, sdf, 
+                                inv_s=64 * 2**idx)
+
+    # [_importance_sampler use z_val_mid, which is a little different from direct sample_pdf]
+    # i.e., sample_pdf(z_vals, weights, n_importance, det=True).detach()
+
+    return _importance_sampler(rays, samples, weights_real, N_importance,
+    use_norm_dir=True, delta_inf=1e10, perturb=0.0, concat_input_sample=True, stop_grad=True)
+
+
+def neus_cal_weight(rays_o, rays_d, z_vals, sdf, inv_s):
     """
     Up sampling give a fixed inv_s
     """
@@ -185,27 +190,7 @@ def neus_upsample(rays_o, rays_d, z_vals, sdf, n_importance, inv_s):
     alpha = (prev_cdf - next_cdf + 1e-5) / (prev_cdf + 1e-5)
     weights = alpha * torch.cumprod(
         torch.cat([torch.ones([N_rays, 1]), 1. - alpha + 1e-7], -1), -1)[:, :-1]
-
-    z_samples = sample_pdf(z_vals, weights, n_importance, det=True).detach()
-    return z_samples
-
-
-def cat_z_vals(rays_o, rays_d, z_vals, new_z_vals, sdf, last=False):
-    batch_size, n_samples = z_vals.shape
-    _, n_importance = new_z_vals.shape
-    pts = rays_o[:, None, :] + rays_d[:, None, :] * new_z_vals[..., :, None]
-    z_vals = torch.cat([z_vals, new_z_vals], dim=-1)
-    z_vals, index = torch.sort(z_vals, dim=-1)
-
-    if not last:
-        # TODO: query sdf of new points
-        # new_sdf = sdf_network.sdf(pts.reshape(-1, 3)).reshape(batch_size, n_importance)
-        sdf = torch.cat([sdf, new_sdf], dim=-1)
-        xx = torch.arange(batch_size)[:, None].expand(batch_size, n_samples + n_importance).reshape(-1)
-        index = index.reshape(-1)
-        sdf = sdf[(xx, index)].reshape(batch_size, n_samples + n_importance)
-
-    return z_vals, sdf
+    return weights
 
 
 def _importance_sampler(rays: Rays,

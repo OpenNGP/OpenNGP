@@ -29,36 +29,28 @@ Config.criterion = {
 }
 Config.primitives = [
     {
-        'name': 'NeuS',
-        'arch': {'name': 'NeuS'}
+        'name': 'nerf-coarse',
+        'arch': {'name': 'BaseNeRF'}
+    },
+    {
+        'name': 'nerf-fine',
+        'arch': {'name': 'BaseNeRF'}
     }
 ]
 Config.pipelines = [
     {
-        'name': 'train-pipeline',
-        'primitive': 'NeuS',
+        'name': 'train-pipeline-0',
+        'primitive': 'nerf-coarse',
         'renderpasses': [
             (
-                'uniform inside',
+                'coarse',
                 ('uniform_sampler', {
-                    'N_samples': 64,
+                    'N_samples': 128,
                     'lindisp': False,
                     'perturb': True
                 }),
-                ('propogate_neus_sdf', {})
+                ('volume_integrator', {})
             )
-            (   'importance inside 0',
-                ('neus_important_sampler',{'N_importance': 16, idx:0}),
-                ('propogate_neus_sdf', {}))
-            (   'importance inside 0',
-                ('neus_important_sampler',{'N_importance': 16, idx:1}),
-                ('propogate_neus_sdf', {}))
-            (   'importance inside 0',
-                ('neus_important_sampler',{'N_importance': 16, idx:2}),
-                ('propogate_neus_sdf', {}))
-            (   'importance inside 0',
-                ('neus_important_sampler',{'N_importance': 16, idx:3}),
-                ('propogate_neus_sdf', {}))
         ]
     },
     {

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from python_api.primitive.component.module import encoder, regressor
 
 class SDFNet(nn.Module):
-    def __init__(self, d_in, d_out, d_hidden, n_layers, skip_in=(4,), N_emb=0, bias=0.5, \
+    def __init__(self, d_in, d_out, d_hidden, n_layers, skip_in=(4,), multires=0, bias=0.5, \
                     geometric_init=True, weight_norm=True, inside_outside=False):
         """
 
@@ -14,19 +14,19 @@ class SDFNet(nn.Module):
             d_hidden (int): MLP hidden dimension, e.g., 256 
             n_layers (int): lays of MLP, e.g., 8
             skip_in (tuple, optional): Defaults to (4,).
-            N_emb (int, optional): Dimension of positional encoding. Defaults to 0.
+            multires (int, optional): Dimension of positional encoding. Defaults to 0.
             bias (float, optional): ****** Defaults to 0.5.
             geometric_init (bool, optional): ******. Defaults to True.
             weight_norm (bool, optional): ******. Defaults to True.
             inside_outside (bool, optional): ******. Defaults to False.
         """
         super().__init__()
-        self.encoder = encoder.Frequency(N_emb)
-        d_in = d_in * (1 + 2*N_emb)  # encoded xyzs
+        self.encoder = encoder.Frequency(multires)
+        d_in = d_in * (1 + 2*multires)  # encoded xyzs
         activation = lambda x: F.softplus(x, beta=200)
         self.regressor = regressor.MLP(D=n_layers,
                                        W=d_hidden,
-                                       input_ch=d_in*(1+2*N_emb),  # encoded xyzs
+                                       input_ch=d_in*(1+2*multires),  # encoded xyzs
                                        output_ch=d_out,
                                        skip_connections=skip_in,
                                        act_on_last_layer=False,

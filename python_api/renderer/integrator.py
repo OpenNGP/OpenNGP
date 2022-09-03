@@ -1,6 +1,7 @@
 import torch
 
 from collections import namedtuple
+from python_api.primitive.component.geometry import sigma
 from python_api.utils import FunctionRegistry
 
 
@@ -12,6 +13,15 @@ def integrate_weight(sigmas, deltas):
     ones = torch.ones((alphas.shape[0], 1), device=alphas.device)
     weights = alphas * torch.cumprod(torch.cat([ones, 1.-alphas + 1e-10], -1), -1)[:, :-1]
     return weights, Pixel(None, None)
+
+
+def propogate_neus_sdf(sigmas):
+    "propogate sdf by weight interface. Followed by neus_important_sampler"
+    return sigmas, Pixel(None, None)
+
+
+def integrate_neus(primitive):
+    pass
 
 
 def volume_integrator(sigmas, rgbs, deltas, z_vals):
@@ -35,5 +45,6 @@ rayintegrator = FunctionRegistry(
     volume_integrator=volume_integrator,
     depth_integrator=depth_integrator,
     weight_integrator=integrate_weight,
-    pass_through_integrator=pass_through_integrator
+    pass_through_integrator=pass_through_integrator,
+    propogate_neus_sdf=propogate_neus_sdf
 )

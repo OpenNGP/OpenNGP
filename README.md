@@ -1,5 +1,13 @@
 # OpenNGP
-With explosion of NeRF-based method and its promising performance to capture/render reality, we believe NGP (neural graphics primitive) has potential to become next generation data type in CG world. This project aims to make NGP first class citizen as with polygon mesh in current DCC (Digital Content Creation) toochain.
+With explosion of NeRF-based method and its promising performance to capture/render reality, we believe NGP (neural graphics primitive) has potential to become next generation data type in CG world. This project aims to make NGP first class citizen as with polygon mesh in current DCC (Digital Content Creation) tool chain.
+
+### Environment
+python3.8
+<details>
+<summary> dependencies (click to expand) </summary>
+- numpy
+- torch
+</details>
 
 Implemented Features:
 1. Configurable render pipeline and NGP arch (Primitive as base class)
