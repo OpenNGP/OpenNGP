@@ -49,5 +49,6 @@ class Config:
     refine_intrinsic: bool = False
     refine_extrinsic: bool = False
     refine_extrinsic_affine_repr: str = 'lie'
+    refine_extrinsic_perturb_std: float = 0
     refine_depth_scale: bool = False
     topk_depth_consistency: int = 0

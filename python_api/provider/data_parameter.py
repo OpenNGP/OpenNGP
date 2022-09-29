@@ -10,6 +10,7 @@ per-data pose
 import torch
 import torch.nn as nn
 
+from python_api.provider.rotation_utils import matrix_to_axis_angle
 
 class ExposureRefine(nn.Module):
     def __init__(self, num_frame):
@@ -36,6 +37,7 @@ class DepthScaleRefine(nn.Module):
 class Lie():
     """
     Lie algebra for SO(3) and SE(3) operations in PyTorch
+    the rotation here follows right-multiplication
     """
 
     @staticmethod
@@ -128,7 +130,7 @@ class Lie():
 
 
 class PoseRefine(nn.Module):
-    def __init__(self, num_frame, affine_repr='lie'):
+    def __init__(self, num_frame, affine_repr='lie', learnable=True):
         super().__init__()
 
         self.num_frame = num_frame
@@ -137,7 +139,11 @@ class PoseRefine(nn.Module):
 
         self.lie = Lie()
 
-        self.vars = nn.Parameter(torch.zeros(self.num_frame, self.num_params))
+        vars = torch.zeros(self.num_frame, self.num_params)
+        if learnable:
+            self.vars = nn.Parameter(vars)
+        else:
+            self.vars = vars
 
     def compose_pair(self, pose_a, pose_b):
         # pose_new(x) = pose_b o pose_a(x)
@@ -186,3 +192,22 @@ class PoseRefine(nn.Module):
                             cos_beta * cos_gamma], -1)
 
         return torch.stack([col1, col2, col3], -1)
+
+    def compare(self, other: 'PoseRefine'):
+        ids = torch.arange(self.num_frame)
+        trans = self.get_translations(ids)
+        other_trans = other.get_translations(ids)
+        trans_diff = (torch.sum((trans + other_trans) ** 2, axis=1)).sqrt().mean()
+        rots = self.get_rotations(ids)
+        other_rots = other.get_rotations(ids)
+        rots_diff = torch.bmm(rots,other_rots)
+        rots_diff = matrix_to_axis_angle(rots_diff)
+        angs_diff = torch.linalg.norm(rots_diff, dim=1)
+        angs_diff = (angs_diff / torch.pi * 180).mean()
+        return trans_diff.item(), angs_diff.item()
+
+
+class PosePurterb(PoseRefine):
+    def __init__(self, num_frame, affine_repr='lie', std=0.):
+        super().__init__(num_frame, affine_repr, False)
+        self.vars.uniform_(-std, std)

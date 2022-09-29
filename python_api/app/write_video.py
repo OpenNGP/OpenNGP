@@ -21,10 +21,12 @@ def main(config_file):
 
     rgbs = [np.array(Image.open(f)) for f in rgb_files]
     depths = [np.array(Image.open(f)) for f in depth_files]
+    rgb_depth = np.concatenate((np.stack(rgbs), np.stack(depths)), axis=2)
 
     import imageio
     imageio.mimwrite(pjoin(vid_dir, 'rgb.mp4'), rgbs, fps=min(30, len(rgbs)), quality=8)
     imageio.mimwrite(pjoin(vid_dir, 'depth.mp4'), depths, fps=min(30, len(depths)), quality=8)
+    imageio.mimwrite(pjoin(vid_dir, 'rgb_depth.mp4'), rgb_depth, fps=min(30, len(rgb_depth)), quality=8)
         
 
 if __name__ == '__main__':

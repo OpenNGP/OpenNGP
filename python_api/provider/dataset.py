@@ -20,9 +20,9 @@ import threading
 import cv2
 import numpy as np
 from os import listdir
-from os.path import exists, join as pjoin, dirname
+from os.path import exists, join as pjoin, dirname, isdir
 from PIL import Image
-from python_api.renderer.rays import Rays, RaysWithDepthCos
+from python_api.renderer.rays import Rays, RaysWithDepthCos, RaysWithDepthCos2
 from python_api.utils.data_helper import namedtuple_map
 
 
@@ -57,7 +57,7 @@ class Dataset(threading.Thread):
     self.queue = queue.Queue(3)  # Set prefetch buffer to 3 batches.
     self.daemon = True
     self.split = split
-    self.data_dir = dirname(data_dir)
+    self.data_dir = data_dir if isdir(data_dir) else dirname(data_dir) 
     self.near = config.near
     self.far = config.far
     self.lazy_ray = config.lazy_ray
@@ -227,8 +227,13 @@ class Dataset(threading.Thread):
 
     depth_cos = -(viewdirs*camtoworlds[:, None, None, :3, 2]).sum(axis=-1)
 
+    ray_idx = np.arange(camtoworlds.shape[0])
+    ray_idx = np.repeat(ray_idx[..., None], self.h, axis=-1)
+    ray_idx = np.repeat(ray_idx[..., None], self.w, axis=-1)
+    ray_idx = ray_idx[..., None]
     ones = np.ones_like(origins[..., :1])
-    return RaysWithDepthCos(
+    return RaysWithDepthCos2(
+        ray_idx=ray_idx,
         origins=origins,
         directions=directions,
         viewdirs=viewdirs,
@@ -351,8 +356,8 @@ class Blender(Dataset):
 
   def _load_renderings(self, config):
     """Load images from disk."""
-    if config.render_path:
-      raise ValueError('render_path cannot be used for the blender dataset.')
+    # if config.render_path:
+    #   raise ValueError('render_path cannot be used for the blender dataset.')
     with open(
         pjoin(self.data_dir, 'transforms_{}.json'.format(self.split)),
         'r') as fp:

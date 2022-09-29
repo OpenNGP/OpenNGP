@@ -1,7 +1,9 @@
 import torch
+import numpy as np
 
 from typing import Union
 from torch.utils.data import DataLoader
+from os.path import join as pjoin
 from python_api.app.config import Config
 from python_api.provider.data_utils import prepare_data
 from python_api.provider.data_utils import srgb_to_linear, linear_to_srgb
@@ -41,6 +43,16 @@ class DataTransformer:
             self.pose_refine = data_parameter.PoseRefine(size, affine_repr)
             self.pose_refine.to(device)
 
+        if config.refine_extrinsic_perturb_std > 0:
+            std = config.refine_extrinsic_perturb_std
+            self.pose_pertrub = data_parameter.PosePurterb(size, affine_repr, std)
+            vars = self.pose_pertrub.vars
+            np.savetxt(pjoin(config.exp_dir, 'pose_perturb.txt'), vars.numpy())
+            self.pose_pertrub.vars = vars.to(device)
+            # self.pose_refine.compare(self.pose_pertrub)
+        else:
+            self.pose_pertrub = None
+
     def preprocess_data(self, batch):
         """_summary_
 
@@ -59,8 +71,24 @@ class DataTransformer:
         if 'linear' == self.color_mode:
             batch['pixels'] = srgb_to_linear(batch['pixels'])
 
+        if self.pose_pertrub is not None:
+            ray_idx = batch['rays'].ray_idx.squeeze()
+            rots = self.pose_pertrub.get_rotations(ray_idx)
+            trans = self.pose_pertrub.get_translations(ray_idx)
+            origins = batch['rays'].origins[..., None]
+            directions = batch['rays'].directions[..., None]
+            viewdirs = batch['rays'].viewdirs[..., None]
+            new_origins = torch.bmm(rots, origins).squeeze() + trans
+            new_directions = torch.bmm(rots, directions).squeeze()
+            new_viewdirs = torch.bmm(rots, viewdirs).squeeze()
+            batch['rays'] = batch['rays']._replace(origins=new_origins,
+                                                   directions=new_directions,
+                                                   viewdirs=new_viewdirs)
+            
+            pass
+
         if self.pose_refine is not None:
-            ray_idx = batch['rays'].ray_idx
+            ray_idx = batch['rays'].ray_idx.squeeze()
             rots = self.pose_refine.get_rotation_matrices(ray_idx)
             trans = self.pose_refine.get_translations(ray_idx)
             origins = batch['rays'].origins[..., None]
