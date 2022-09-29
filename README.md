@@ -16,6 +16,9 @@ Class Design
 Data Flow
 ![OpenNGP_dataflow](https://user-images.githubusercontent.com/7394919/165758547-b5b39fec-7045-44dc-9cb8-2f574dd442d5.jpg)
 
+Examples:
+![Methods](https://user-images.githubusercontent.com/7394919/175198696-86223bfe-dba2-4160-9f83-48777d53c447.jpg)
+
 [wiki](https://github.com/openNGP/openNGP/wiki)
 
 Acknowledgements:\
