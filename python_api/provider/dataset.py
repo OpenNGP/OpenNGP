@@ -388,6 +388,141 @@ class Blender(Dataset):
     self.n_examples = self.images.shape[0]
 
 
+def vis_camera(cam2world, filename, scale=1.0):
+  """
+    cam2world: [4,4]
+  """
+  corners = np.array([
+    [-2, -2, -1],
+    [2, -2, -1],
+    [2, 2, -1],
+    [-2, 2, -1]
+  ])
+  rays_d = (cam2world[:3,:3] @ (corners.T)).T
+  rays_d = rays_d / np.linalg.norm(rays_d, axis=-1, keepdims=True)  # [4,3]
+  rays_o = cam2world[:3,3]  # [3,]
+  pts = np.stack([rays_o] + [rays_o+x*scale for x in rays_d], axis=0)  # [5,3]
+  ### save to obj
+  lines = []
+  for pt in pts:
+      line = "v %f %f %f\n" % (pt[0], pt[1], pt[2])
+      lines.append(line)
+  pt = (pts[3] + pts[4] - pts[1:].mean(axis=0) * 0.5)/1.5  # add 
+  lines.append("v %f %f %f\n" % (pt[0], pt[1], pt[2]))
+  with open(filename, 'w') as f:
+      f.writelines(lines)
+      # 4---------3
+      # |    0    | 
+      # 1-------- 2
+      # add connection
+      f.write("f %d %d %d\n" % (1,2,5))
+      f.write("f %d %d %d\n" % (1,2,3))
+      f.write("f %d %d %d\n" % (1,3,4))
+      f.write("f %d %d %d\n" % (1,4,5))
+      f.write("f %d %d %d\n" % (4,5,6))
+
+
+class NeuS(Dataset):
+  """Neus Dataset"""
+  def _load_renderings(self, config):
+    """Load images from disk."""
+    # if config.render_path:
+    #   raise ValueError('render_path cannot be used for the blender dataset.')
+    with open(
+        pjoin(self.data_dir, 'transforms_{}.json'.format(self.split)),
+        'r') as fp:
+      meta = json.load(fp)
+    images = []
+    cams = []
+    for i in range(len(meta['frames'])):
+      frame = meta['frames'][i]
+      fname = pjoin(self.data_dir, frame['file_path'] + '.png')
+      with open(fname, 'rb') as imgin:
+        image = np.array(Image.open(imgin), dtype=np.float32) / 255.
+        if config.factor == 2:
+          [halfres_h, halfres_w] = [hw // 2 for hw in image.shape[:2]]
+          image = cv2.resize(
+              image, (halfres_w, halfres_h), interpolation=cv2.INTER_AREA)
+        elif config.factor > 0:
+          raise ValueError('Blender dataset only supports factor=0 or 2, {} '
+                           'set.'.format(config.factor))
+      cams.append(np.array(frame['transform_matrix'], dtype=np.float32))
+      images.append(image)
+    self.images = np.stack(images, axis=0)
+    if config.white_bkgd:
+      self.images = (
+          self.images[..., :3] * self.images[..., -1:] +
+          (1. - self.images[..., -1:]))
+    else:
+      self.images = self.images[..., :3]
+    self.h, self.w = self.images.shape[1:3]
+    self.resolution = self.h * self.w
+    self.camtoworlds = np.stack(cams, axis=0)  # [bs,4,4]
+    camera_angle_x = float(meta['camera_angle_x'])
+    self.focal = .5 * self.w / np.tan(.5 * camera_angle_x)
+    self.n_examples = self.images.shape[0]
+
+    # for idx, cam in enumerate(self.camtoworlds[::10]):
+    #   vis_camera(cam, "debug_%d.obj" % idx)
+
+    self.camtoworlds[:,:3,3] = self.camtoworlds[:,:3,3] / 3.0
+    # self._load_with_camera_pose(self.camtoworlds, config)
+
+    # for idx, cam in enumerate(self.camtoworlds[::10]):
+    #   vis_camera(cam, "debug_%d_new.obj" % idx)
+    pass
+
+  def _load_with_point_cloud(self):
+    pass
+
+  def _load_with_camera_pose(self, cam2world, config):
+    """
+      cam2world: [bs,4,4]
+    """
+    cam_pos = cam2world[:,:3,3]  # camera position [bs,3]
+    center = np.zeros(3)  # [3,], assume in center in origin
+    #TODO replace center calculation with _calculate_center()
+    radius = np.linalg.norm(cam_pos - center[None,:], ord=2, axis=-1).max()
+    scale_mat = np.diag([radius, radius, radius, 1.0]).astype(np.float32)
+    scale_mat[:3, 3] = center
+    self.scale_mat_inv = np.broadcast_to(np.linalg.inv(scale_mat), cam2world.shape)  # [bs,4,4]
+    # bmm, only apply to the translation
+    cam2world[:,:,3] = np.matmul(self.scale_mat_inv, cam2world[:,:,3])
+
+    self.camtoworlds = cam2world  # [bs,4,4]
+
+  # TODO complete this part
+  def _calculate_center(self, cam2world):
+    """estimate view center according camera poses
+      cam2world: [bs,4,4]
+    """
+    ray_o = cam2world[:,:3,3]  # [bs,3]
+    ray_d = cam2world[:,1:,:]  # [bs,3]
+    ray_d = ray_d / np.linalg.norm(ray_d, axis=1, keepdims=True)
+    pts = []
+
+    np.random.seed(1)  # set random seed, to avoid different every time
+    for _ in range(100):
+        id1, id2 = np.random.choice(np.arange(ray_o.shape[0]), 2, replace=False)
+        ### calculate A * t = b
+        A, b = np.zeros((2,2)), np.zeros(2,)
+        A[0,0] = np.dot(ray_d[id1], ray_d[id1])
+        A[0,1] = -1 * np.dot(ray_d[id1], ray_d[id2])
+        A[1,0] = np.dot(ray_d[id1], ray_d[id2])
+        A[1,1] = -1 * np.dot(ray_d[id2], ray_d[id2])
+        b[0] = np.dot(ray_o[id2]-ray_o[id1], ray_d[id1])
+        b[1] = np.dot(ray_o[id2]-ray_o[id1], ray_d[id2])
+        try:
+            t = np.linalg.solve(A, b)
+            pts.append(ray_o[[id1,id2]] + ray_d[[id1,id2]] * t[:,np.newaxis])
+        except:
+            print("unable to solve ...")
+            continue
+    pts = np.concatenate(pts, axis=0)  # [20, 3]
+    # print("center", pts.mean(axis=0))
+    return pts.mean(axis=0)
+
+
 class Muyu(Dataset):
   """Muyu Dataset."""
 

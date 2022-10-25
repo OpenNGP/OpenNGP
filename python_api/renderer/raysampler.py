@@ -108,7 +108,7 @@ def uniform_sampler(rays: Rays, N_samples: int, lindisp: bool, perturb: bool):
     return SamplerResult(pts, views, z_vals, deltas)
 
 
-def neus_outside_sampler(rays: Rays, N_samples_outside: int, N_samples: int, perturb: float):
+def neus_outside_sampler(rays: Rays, N_samples_outside: int, N_samples: int, perturb: float, samples: SamplerResult):
     near, far = rays.near, rays.far  # [N_rays,], [N_rays,]
     rays_o, rays_d = rays.origins, rays.directions  # [N_rays, 3], [N_rays, 3]
     N_rays = rays_o.shape[0]
@@ -122,8 +122,10 @@ def neus_outside_sampler(rays: Rays, N_samples_outside: int, N_samples: int, per
             lower = torch.cat([z_vals_outside[..., :1], mids], -1)
             t_rand = torch.rand([N_rays, z_vals_outside.shape[-1]])
             z_vals_outside = lower[None, :] + (upper - lower)[None, :] * t_rand
-        z_vals_outside = far / torch.flip(z_vals_outside, dims=[-1]) + 1.0 / N_samples  # range from far to infinity. But why N_samples?
+        z_vals_outside = far / torch.flip(z_vals_outside, dims=[-1]).to(far.device) + 1.0 / N_samples  # range from far to infinity. But why N_samples?
 
+    z_vals = samples.z_vals
+    z_vals_outside = torch.cat([z_vals, z_vals_outside], dim=-1)
     pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals_outside[...,:,None] # [N_rays, N_samples, 3]
     
     # Convert these values using volume rendering (Section 4)
@@ -134,63 +136,20 @@ def neus_outside_sampler(rays: Rays, N_samples_outside: int, N_samples: int, per
 
 
 def neus_important_sampler(rays: Rays, samples: SamplerResult, weights,
-                           N_importance: int, idx: int):
-    rays_o, rays_d = rays.origins, rays.directions  # [N_rays, 3], [N_rays, 3]
-    z_vals = samples.z_vals
-    sdf = weights
+                           N_importance: int):
+    # rays_o, rays_d = rays.origins, rays.directions  # [N_rays, 3], [N_rays, 3]
+    # z_vals = samples.z_vals
+    # sdf = weights
 
-    weights_real = neus_cal_weight(rays_o, rays_d, z_vals, sdf, 
-                                inv_s=64 * 2**idx)
+    # weights_real = neus_cal_weight(rays_o, rays_d, z_vals, sdf, 
+    #                             inv_s=64 * 2**idx)
 
     # [_importance_sampler use z_val_mid, which is a little different from direct sample_pdf]
     # i.e., sample_pdf(z_vals, weights, n_importance, det=True).detach()
+    weights = torch.cat([weights, torch.zeros_like(weights[...,-1:])], dim=-1)
 
-    return _importance_sampler(rays, samples, weights_real, N_importance,
+    return _importance_sampler(rays, samples, weights, N_importance,
     use_norm_dir=True, delta_inf=1e10, perturb=0.0, concat_input_sample=True, stop_grad=True)
-
-
-def neus_cal_weight(rays_o, rays_d, z_vals, sdf, inv_s):
-    """
-    Up sampling give a fixed inv_s
-    """
-    N_rays, N_samples = z_vals.shape
-    pts = rays_o[:, None, :] + rays_d[:, None, :] * z_vals[..., :, None]  # N_rays, N_samples, 3
-    radius = torch.linalg.norm(pts, ord=2, dim=-1, keepdim=False)
-    inside_sphere = (radius[:, :-1] < 1.0) | (radius[:, 1:] < 1.0)
-    sdf = sdf.reshape(N_rays, N_samples)  # N_rays, N_samples
-    prev_sdf, next_sdf = sdf[:, :-1], sdf[:, 1:]
-    prev_z_vals, next_z_vals = z_vals[:, :-1], z_vals[:, 1:]
-    mid_sdf = (prev_sdf + next_sdf) * 0.5
-    cos_val = (next_sdf - prev_sdf) / (next_z_vals - prev_z_vals + 1e-5)
-    # ----------------------------------------------------------------------------------------------------------
-    # Use min value of [ cos, prev_cos ]
-    # Though it makes the sampling (not rendering) a little bit biased, this strategy can make the sampling more
-    # robust when meeting situations like below:
-    #
-    # SDF
-    # ^
-    # |\          -----x----...
-    # | \        /
-    # |  x      x
-    # |---\----/-------------> 0 level
-    # |    \  /
-    # |     \/
-    # |
-    # ----------------------------------------------------------------------------------------------------------
-    prev_cos_val = torch.cat([torch.zeros([N_rays, 1]), cos_val[:, :-1]], dim=-1)
-    cos_val = torch.stack([prev_cos_val, cos_val], dim=-1)
-    cos_val, _ = torch.min(cos_val, dim=-1, keepdim=False)
-    cos_val = cos_val.clip(-1e3, 0.0) * inside_sphere
-
-    dist = (next_z_vals - prev_z_vals)
-    prev_esti_sdf = mid_sdf - cos_val * dist * 0.5
-    next_esti_sdf = mid_sdf + cos_val * dist * 0.5
-    prev_cdf = torch.sigmoid(prev_esti_sdf * inv_s)
-    next_cdf = torch.sigmoid(next_esti_sdf * inv_s)
-    alpha = (prev_cdf - next_cdf + 1e-5) / (prev_cdf + 1e-5)
-    weights = alpha * torch.cumprod(
-        torch.cat([torch.ones([N_rays, 1]), 1. - alpha + 1e-7], -1), -1)[:, :-1]
-    return weights
 
 
 def _importance_sampler(rays: Rays,
@@ -418,5 +377,6 @@ raysampler = FunctionRegistry(
     ngp_importance_sampler=ngp_importance_sampler,
     ngp_sampler_with_depth=ngp_sampler_with_depth,
     sparsity_sampler=sparsity_sampler,
-    neus_sampler=neus_sampler
+    neus_important_sampler=neus_important_sampler,
+    neus_outside_sampler=neus_outside_sampler
 )

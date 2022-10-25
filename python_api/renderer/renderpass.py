@@ -50,9 +50,23 @@ class RenderPass:
         sampler_result = raysampler[self.sampler](**sampler_inputs)
 
         # 2. query infos from NGP
-        sigmas, geo_features = primitive.query_sigma(sampler_result.xyzs)
+        query_sigma_ctx = {**primitive.default_query_sigma_ctx()}
+        if 'geo_features' in self.integrator_args:  # save normal in the first 3 channels of geo_feature
+            query_sigma_ctx['normal'] = True
+        query_sigma_inputs = {k: query_sigma_ctx[k] for k in primitive.default_query_sigma_ctx()}
+        sigmas, geo_features = primitive.query_sigma(sampler_result.xyzs, **query_sigma_inputs)
+
+        query_color_ctx = {**primitive.default_query_color_ctx()}
+
+
+        # if 'geo_features' in self.integrator_args:  # save normal in the first 3 channels of geo_feature
+        #     sigmas, geo_features = primitive.query_sigma_with_normal(sampler_result.xyzs)
+        # else:
+        #     sigmas, geo_features = primitive.query_sigma(sampler_result.xyzs)
         if 'rgbs' in self.integrator_args:  # save computation
-            rgbs = primitive.query_color(geo_features, sampler_result.views)
+            query_color_ctx = {**primitive.default_query_color_ctx()}
+            query_color_inputs = {k: sampler_result._asdict()[k] for k,v in query_color_ctx.items() if v}
+            rgbs = primitive.query_color(geo_features, sampler_result.views, **query_color_inputs)
         else:
             rgbs = None        
 
@@ -60,7 +74,7 @@ class RenderPass:
         integrator_ctx = {**self.integrator_default_args}
         integrator_ctx.update(context)
         integrator_ctx.update(sampler_result._asdict())
-        integrator_ctx.update({'sigmas': sigmas, 'rgbs': rgbs})
+        integrator_ctx.update({'sigmas': sigmas, 'rgbs': rgbs, 'geo_features':geo_features})
         intgr_inputs = {k: integrator_ctx[k] for k in self.integrator_args}
         weights, pixels = rayintegrator[self.integrator](**intgr_inputs)
 

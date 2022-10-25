@@ -15,21 +15,45 @@ class NeuS(Primitive):
         self.deviation = SingleVariable(init_val=0.3)
 
         self.normal_cache = None
-        pass
 
-    def query_sigma(self, xyzs):
+    def default_query_sigma_ctx(self):
+        return {'normal': False}
+
+    def default_query_color_ctx(self):
+        return {'xyzs': True}
+
+    def to(self, device):
+        self.appearance.to(device)
+        self.geometry.to(device)
+        self.deviation.to(device)
+
+    def parameters(self):
+        return list(self.geometry.parameters()) + list(self.appearance.parameters()) +\
+            list(self.deviation.parameters())
+
+    # def query_sigma(self, xyzs):
+    #     sdf, geo_features = self.geometry.forward(xyzs)
+    #     # self.normal_cache = None
+    #     # return sdf, torch.cat([xyzs, geo_features], dim=1)
+    #     return sdf, geo_features  # [N_ray,N_sample,1], [N_ray,N_sample,3]
+
+    def query_sigma(self, xyzs, normal=False):
         sdf, geo_features = self.geometry.forward(xyzs)
-        self.normal_cache = None
-        return sdf, torch.cat([xyzs, geo_features], dim=1)
+        if normal:
+            normal = self.geometry.gradient(xyzs)
+            geo_features = torch.cat([normal, geo_features], dim=-1)
+        return sdf, geo_features
 
-    def query_color(self, points, normals, view_dirs, feature_vectors):
-        return self.appearance.forward(points, normals, view_dirs, feature_vectors)
 
-    def query_color(self, geo_features, view_dirs):
-        points, feature_vectors = geo_features.split([3,self.d_feature,3], dim=1)
-        normals = self.geometry.gradient(points)
-        self.normal_cache = normals 
-        return self.appearance.forward(points, normals, view_dirs, feature_vectors)
+    # def query_color(self, points, normals, view_dirs, feature_vectors):
+    #     return self.appearance.forward(points, normals, view_dirs, feature_vectors)
+
+    def query_normal(self, points):
+        return self.geometry.gradient(points)
+
+    def query_color(self, geo_features, views, xyzs):
+        normals, feature_vectors = geo_features.split([3,self.d_feature], dim=-1)
+        return self.appearance.forward(xyzs, normals, views, feature_vectors)
 
     def query_shaped_invs(self, shape):
         """

@@ -47,7 +47,7 @@ def integrate_neus_upsample_weight(xyzs, sigmas, z_vals, idx):
     # |     \/
     # |
     # ----------------------------------------------------------------------------------------------------------
-    prev_cos_val = torch.cat([torch.zeros([N_rays, 1]), cos_val[:, :-1]], dim=-1)
+    prev_cos_val = torch.cat([torch.zeros([N_rays, 1]).to(cos_val.device), cos_val[:, :-1]], dim=-1)
     cos_val = torch.stack([prev_cos_val, cos_val], dim=-1)
     cos_val, _ = torch.min(cos_val, dim=-1, keepdim=False)
     cos_val = cos_val.clip(-1e3, 0.0) * inside_sphere
@@ -59,17 +59,17 @@ def integrate_neus_upsample_weight(xyzs, sigmas, z_vals, idx):
     next_cdf = torch.sigmoid(next_esti_sdf * inv_s)
     alpha = (prev_cdf - next_cdf + 1e-5) / (prev_cdf + 1e-5)
     weights = alpha * torch.cumprod(
-        torch.cat([torch.ones([N_rays, 1]), 1. - alpha + 1e-7], -1), -1)[:, :-1]
+        torch.cat([torch.ones([N_rays, 1]).to(alpha.device), 1. - alpha + 1e-7], -1), -1)[:, :-1]
     return weights, Pixel(None, None)
 
 
-def integrate_neus(primitive, xyzs, deltas, views, sigmas, rgbs):
+def integrate_neus(primitive, xyzs, deltas, views, sigmas, rgbs, geo_features):
     sdf = sigmas
-    normals = primitive.normal_cache
+    normals = geo_features[...,:3]
     ### calculate weight
-    inv_s = primitive.query_shaped_invs(sdf.shape)
+    inv_s = primitive.query_shaped_invs(sdf.shape).reshape(-1,1)
 
-    true_cos = (views * normals).sum(-1, keepdim=True)
+    true_cos = (views * normals).sum(-1)
 
     cos_anneal_ratio = 1.0  # TODO add decay ratio with iter_step
     # "cos_anneal_ratio" grows from 0 to 1 in the beginning training iterations. The anneal strategy below makes
@@ -79,8 +79,8 @@ def integrate_neus(primitive, xyzs, deltas, views, sigmas, rgbs):
 
     dists = deltas
     # Estimate signed distances at section points
-    estimated_next_sdf = sdf + iter_cos * dists.reshape(-1, 1) * 0.5
-    estimated_prev_sdf = sdf - iter_cos * dists.reshape(-1, 1) * 0.5
+    estimated_next_sdf = (sdf + iter_cos * dists).reshape(-1, 1) * 0.5
+    estimated_prev_sdf = (sdf - iter_cos * dists).reshape(-1, 1) * 0.5
 
     prev_cdf = torch.sigmoid(estimated_prev_sdf * inv_s)
     next_cdf = torch.sigmoid(estimated_next_sdf * inv_s)
@@ -95,7 +95,7 @@ def integrate_neus(primitive, xyzs, deltas, views, sigmas, rgbs):
     relax_inside_sphere = (pts_norm < 1.2).float().detach()
 
     batch_size = sdf.shape[0]
-    weights = alpha * torch.cumprod(torch.cat([torch.ones([batch_size, 1]), 1. - alpha + 1e-7], -1), -1)[:, :-1]
+    weights = alpha * torch.cumprod(torch.cat([torch.ones_like(alpha[...,:1]), 1. - alpha + 1e-7], -1), -1)[:, :-1]
 
     ### weighted sum
     colors = (rgbs * weights[:, :, None]).sum(dim=1)
@@ -124,5 +124,7 @@ rayintegrator = FunctionRegistry(
     depth_integrator=depth_integrator,
     weight_integrator=integrate_weight,
     pass_through_integrator=pass_through_integrator,
-    propogate_neus_sdf=propogate_neus_sdf
+    propogate_neus_sdf=propogate_neus_sdf,
+    integrate_neus_upsample_weight=integrate_neus_upsample_weight,
+    integrate_neus=integrate_neus
 )

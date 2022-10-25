@@ -1,11 +1,11 @@
 Config.data_dir = '../lego/'
-Config.exp_dir = '../OpenNGP_Exp/debug_neus_dataset2'
-Config.dataset_loader = 'neus'
+Config.exp_dir = '../OpenNGP_Exp/debug_nerf2'
+Config.dataset_loader = 'blender'
 Config.torch_dataset = False
 Config.batching = 'single_image'
 Config.batch_size = 1024
-Config.near = 0.1
-Config.far = 2
+Config.near = 2
+Config.far = 6
 Config.white_bkgd = False
 Config.max_steps = 120000
 Config.save_every = 1000

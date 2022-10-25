@@ -15,6 +15,8 @@ class PixelLoss(nn.Module):
             self.criterion = torch.nn.HuberLoss(delta=0.1)
         elif 'l2' == diff_type:
             self.criterion = torch.nn.MSELoss()
+        elif 'l1' == diff_type:
+            self.criterion = torch.nn.L1Loss()
         else:
             raise ValueError
     

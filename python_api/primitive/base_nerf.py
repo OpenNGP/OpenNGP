@@ -12,7 +12,7 @@ class BaseNeRF(Primitive):
     def query_sigma(self, xyzs):
         return self.geometry.forward(xyzs)
 
-    def query_color(self, geo_features, views):
+    def query_color(self, geo_features, views, **args):
         return self.appearance.forward(geo_features, views)
 
     def to(self, device):

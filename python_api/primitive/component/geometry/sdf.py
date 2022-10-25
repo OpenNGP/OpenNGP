@@ -22,7 +22,7 @@ class SDFNet(nn.Module):
         """
         super().__init__()
         self.encoder = encoder.Frequency(multires)
-        d_in = d_in * (1 + 2*multires)  # encoded xyzs
+        # d_in = d_in * (1 + 2*multires)  # encoded xyzs
         activation = lambda x: F.softplus(x, beta=200)
         self.regressor = regressor.MLP(D=n_layers,
                                        W=d_hidden,
@@ -53,6 +53,6 @@ class SDFNet(nn.Module):
             create_graph=True,
             retain_graph=True,
             only_inputs=True)[0]
-        return gradients.unsqueeze(1)
+        return gradients
 
     

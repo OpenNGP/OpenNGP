@@ -9,4 +9,4 @@ class SingleVariable(nn.Module):
         self.register_parameter('variance', nn.Parameter(torch.tensor(init_val)))
 
     def forward(self, shape):
-        return torch.ones(shape) * torch.exp(self.variance * 10.0)
+        return torch.ones(shape).to(self.variance.device) * torch.exp(self.variance * 10.0)

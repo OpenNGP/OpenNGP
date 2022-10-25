@@ -7,6 +7,13 @@ python3.8
 <summary> dependencies (click to expand) </summary>
 - numpy
 - torch
+- pillow
+- tqdm
+- tensorboardX
+- gin-config
+- opencv-python
+- scipy
+- rich
 </details>
 
 Implemented Features:

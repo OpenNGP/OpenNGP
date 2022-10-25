@@ -6,13 +6,25 @@ class Primitive(ABC):
     def __init__(self) -> None:
         super().__init__()
 
+    def default_query_ctx(self):
+        return {}
+
+    def default_query_sigma_ctx(self):
+        return {}
+
+    def default_query_color_ctx(self):
+        return {}
+
     def query(self, xyzs):
         return np.array([])
 
     def query_sigma(self, xyzs):
         return np.array([])
 
-    def query_color(self, geo_features, views):
+    def query_color(self, geo_features, views, **args):
+        return np.array([])
+
+    def query_color(self, geo_features, xyzs, views, **args):
         return np.array([])
 
     def build_module_graph(self, module_key, module):

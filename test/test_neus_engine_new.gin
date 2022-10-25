@@ -1,11 +1,11 @@
-Config.data_dir = '../lego'
+Config.data_dir = '../lego/'
 Config.exp_dir = '../OpenNGP_Exp/debug_neus'
-Config.dataset_loader = 'blender'
+Config.dataset_loader = 'neus'
 Config.torch_dataset = False
 Config.batching = 'single_image'
-Config.batch_size = 1024
-Config.near = 2
-Config.far = 6
+Config.batch_size = 100
+Config.near = 0.01
+Config.far = 2
 Config.white_bkgd = False
 Config.max_steps = 120000
 Config.save_every = 10000
@@ -18,11 +18,15 @@ Config.criterion = {
     'loss_configs': [
         {
             'name': 'PixelLoss',
-            'diff_type': 'l2', 
+            'diff_type': 'l1', 
             'depth_diff_type': 'huber',
             'bound': 1.5,
             'epsilon': 0.075,  # 3*std
             'decay': 500
+        },
+        {
+            'name': 'EikonalLoss',
+            'igr_weight': 0.1
         }
     ]
 
@@ -31,11 +35,15 @@ Config.primitives = [
     {
         'name': 'NeuS',
         'arch': {'name': 'NeuS'}
+    },
+    {
+        'name': 'nerf-outside',
+        'arch': {'name': 'BaseNeRF'}
     }
 ]
 Config.pipelines = [
     {
-        'name': 'train-pipeline',
+        'name': 'render inside',
         'primitive': 'NeuS',
         'renderpasses': [
             (
@@ -45,30 +53,34 @@ Config.pipelines = [
                     'lindisp': False,
                     'perturb': True
                 }),
-                ('integrate_neus_upsample_weight', {idx:0})
-            )
+                ('integrate_neus_upsample_weight', {'idx':0})
+            ),
             (   'importance inside 0',
                 ('neus_important_sampler',{'N_importance': 16}),
-                ('integrate_neus_upsample_weight', {idx:1}))
+                ('integrate_neus_upsample_weight', {'idx':1})
+            ),
             (   'importance inside 1',
                 ('neus_important_sampler',{'N_importance': 16}),
-                (''integrate_neus_upsample_weight', {idx:2}))
+                ('integrate_neus_upsample_weight', {'idx':2})
+            ),
             (   'importance inside 2',
                 ('neus_important_sampler',{'N_importance': 16}),
-                ('integrate_neus_upsample_weight', {idx:3}))
+                ('integrate_neus_upsample_weight', {'idx':3})
+            ),
             (   'importance inside 3',
                 ('neus_important_sampler',{'N_importance': 16}),
-                ('propogate_neus_sdf', {}))
+                ('integrate_neus', {}))
         ]
     },
     {
-        'name': 'train-pipeline-1',
-        'primitive': 'nerf-fine',
+        'name': 'render outside',
+        'primitive': 'nerf-outside',
         'renderpasses': [
             (
                 'fine',
-                ('importance_sampler', {
-                    'N_importance': 128,
+                ('neus_outside_sampler', {
+                    'N_samples_outside': 32,
+                    'N_samples': 64,
                     'lindisp': False,
                     'perturb': True,
                     'use_norm_dir': False
